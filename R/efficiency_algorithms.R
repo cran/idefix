@@ -66,6 +66,7 @@
 #' set.seed(123) 
 #' ps <- MASS::mvrnorm(n = 10, mu = m, Sigma = v) # 10 Samples.
 #' Modfed(cand.set = cs, n.sets = 8, n.alts = 2, alt.cte = c(1, 0), par.draws = ps)
+#' @importFrom Rdpack reprompt
 #' @references
 #' \insertRef{federov}{mnldes} 
 #' @export
@@ -74,9 +75,12 @@ Modfed <- function(cand.set, n.sets, n.alts,  alt.cte, par.draws, start.des = NU
   if (!(is.matrix(par.draws))) {
     par.draws <- matrix(par.draws, nrow = 1)
   }
-  # Error alternative specific constants. 
+  # Errors alternative specific constants. 
   if (length(alt.cte) != n.alts) {
     stop("n.alts does not match the alt.cte vector")
+  }
+  if (!all(alt.cte %in% c(0,1))){
+    stop("alt.cte should only contain 0s or 1s.")
   }
   # Error identifying model.
   if (n.sets < ncol(par.draws)) {
@@ -95,7 +99,7 @@ Modfed <- function(cand.set, n.sets, n.alts,  alt.cte, par.draws, start.des = NU
   cte.des <- Altspec(alt.cte = alt.cte, n.sets = n.sets)
   # Error handling cte.des
   if (ncol(cand.set) + ncol(cte.des) != ncol(par.draws)) {
-    stop("dimension of par.draws does not match the dimension of alt.cte + cand.set.")
+    stop("The number of parameters in par.draws does not match the number of parameters for alt.cte + the number of paramters in cand.set.")
   }
   # Random start design.
   db.start <- NA
@@ -252,6 +256,7 @@ Modfed <- function(cand.set, n.sets, n.alts,  alt.cte, par.draws, start.des = NU
 #' des <- Modfed(cand.set = cs, n.sets = 6, n.alts = 2, alt.cte = ac, par.draws = ps)$design
 #' # Efficient choice set to add. 
 #' SeqDB(des = des, cand.set = cs, n.alts = 2, par.draws = ps, prior.covar = pc)
+#' @importFrom Rdpack reprompt
 #' @references
 #' \insertRef{ju}{mnldes} 
 #' @export
@@ -318,7 +323,9 @@ SeqDB <- function(des, cand.set, n.alts, par.draws, prior.covar, reduce = TRUE, 
 #'   reduced or not.
 #' @return \item{set}{Numeric matrix containing the choice set that maximizes the expected KL divergence.}
 #' \item{kl}{Numeric value which is the Kullback leibler divergence.}
-#' @references \insertRef{crabbe}{mnldes}
+#' @importFrom Rdpack reprompt
+#' @references 
+#' \insertRef{crabbe}{mnldes}
 #' @examples 
 #' # KL efficient choice set, given parameter samples. 
 #' # Candidate profiles 
@@ -351,7 +358,7 @@ SeqKL <- function(cand.set, n.alts, alt.cte, par.draws, weights, reduce = TRUE) 
   if (length(alt.cte) != n.alts) {
     stop("n.alts does not match the alt.cte vector")
   }
-  # Create alternative specific design.
+  # Create alternative specific design. 
   cte.des <- Altspec(alt.cte = alt.cte, n.sets = 1)
   # Error handling cte.des
   if (ncol(cand.set) + ncol(cte.des) != ncol(par.draws)) {
