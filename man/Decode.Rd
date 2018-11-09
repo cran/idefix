@@ -4,11 +4,15 @@
 \alias{Decode}
 \title{Coded design to readable design.}
 \usage{
-Decode(des, lvl.names, coding, alt.cte = NULL, c.lvls = NULL)
+Decode(des, n.alts, lvl.names, coding, alt.cte = NULL, c.lvls = NULL,
+  no.choice = NULL)
 }
 \arguments{
 \item{des}{A numeric matrix which represents the design matrix. Each row is a
 profile.}
+
+\item{n.alts}{Numeric value indicating the number of alternatives per choice
+set.}
 
 \item{lvl.names}{A list containing character vectors with the values of each
 level of each attribute.}
@@ -21,6 +25,9 @@ alternative specific constant is present. The default is \code{NULL}.}
 
 \item{c.lvls}{A list containing numeric vectors with the attributelevels for
 each continuous attribute. The default is \code{NULL}.}
+
+\item{no.choice}{An integer indicating the no choice alternative. The default
+is \code{NULL}.}
 }
 \value{
 \item{design}{A character matrix which represents the design.}

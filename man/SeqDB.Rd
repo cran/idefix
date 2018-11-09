@@ -26,8 +26,8 @@ set.}
 \item{alt.cte}{A binary vector indicating for each alternative whether an
 alternative specific constant is desired. The default is \code{NULL}.}
 
-\item{no.choice}{A logical value indicating whether a no choice alternative
-should be added to each choice set. The default is \code{NULL}.}
+\item{no.choice}{An integer indicating the no choice alternative. The default
+is \code{NULL}.}
 
 \item{weights}{A vector containing the weights of the draws. Default is
 \code{NULL}, See also \code{\link{ImpsampMNL}}.}
@@ -40,7 +40,7 @@ reduced or not.}
 }
 \value{
 \item{set}{A matrix representing a DB efficient choice set.}
-\item{db.error}{A numeric value indicating the DB-error of the whole
+\item{error}{A numeric value indicating the DB-error of the whole
 design.}
 }
 \description{

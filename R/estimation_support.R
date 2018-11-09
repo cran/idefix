@@ -235,17 +235,20 @@ Datatrans <- function(pkg, des, y, n.alts, n.sets, n.resp, bin, alt.names = NULL
 #' RespondMNL(par=true_par, des = des, n.alts = 2)
 #' @export
 RespondMNL <- function(par, des, n.alts, bin = TRUE) {
+  if (!is.matrix(des)){
+    stop("'des' should be a matrix")
+  }
   # Error par is not vector
   if (!is.vector(par)) {
-    stop('par should be a vector.')
+    stop("'par' should be a vector")
   }
   # Error n.alts 
   if ((nrow(des) %% n.alts) != 0) {
-    stop('number of rows in des is not a multiple of n.alts.')
+    stop("number of rows in 'des' is not a multiple of 'n.alts'")
   }
   # Error par
   if (ncol(des) != length(par)) {
-    stop("length of par vector does not match the number of parameters in the design.")
+    stop("length of 'par' does not match the number of columns in 'des'")
   }
   # Probability
   group <- rep(seq(1, nrow(des) / n.alts, 1), each = n.alts)

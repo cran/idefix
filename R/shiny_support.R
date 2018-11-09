@@ -227,7 +227,7 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
   } else {
     # Error 
     if (length(alt.cte) != n.alts) {
-      stop("'n.alts' does not match the 'alt.cte' vector")
+      stop("length(alts) does not match length(alt.cte)")
     }
     if (!all(alt.cte %in% c(0, 1))){
       stop("'alt.cte' should only contain 0's or 1's.")
@@ -299,14 +299,12 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
       warning("'n.draws' will be ignored, since there are no adaptive sets.")
     }
   }
-  #c.lvls
-  
   if(is.null(des)){
     fulldes <- matrix(data = NA, nrow = (n.alts * n.total), ncol = ncol(cand.set))
   } else {
     bs <- seq(1, (nrow(des) - n.alts + 1), n.alts)
     es <- c((bs - 1), nrow(des))[-1] 
-    rowcol <- Rcnames(n.sets = n.init, n.alts = n.alts, alt.cte = alt.cte)
+    rowcol <- Rcnames(n.sets = n.init, n.alts = n.alts, alt.cte = alt.cte, no.choice = FALSE)
     rownames(des) <- rowcol[[1]]
     if (is.null(colnames(des))){
       colnames(des) <- c(rowcol[[2]], paste("par", 1:(ncol(des) - n.cte), sep = "."))
@@ -321,7 +319,6 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
         warning("no.choice.cte column name detected in 'des' while 'no.choice = NULL'")
       }
     }
-    
   }
   
   shinyApp(
@@ -379,19 +376,20 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
             
             ## Design storage
             if (sn == 1) {
-              rowcol <- Rcnames(n.sets = 1, n.alts = n.alts, alt.cte = alt.cte)
+              rowcol <- Rcnames(n.sets = 1, n.alts = n.alts, alt.cte = alt.cte, no.choice = FALSE)
               rownames(set) <- rownames(set, do.NULL = FALSE, prefix = paste(paste("set", sn , sep = ""), "alt", sep = "."))
               colnames(set) <- c(rowcol[[2]], paste("par", 1:(ncol(set) - n.cte), sep = "."))
               fulldes <<- set
             } else {
-              rowcol <- Rcnames(n.sets = 1, n.alts = n.alts, alt.cte = alt.cte)
+              rowcol <- Rcnames(n.sets = 1, n.alts = n.alts, alt.cte = alt.cte, no.choice = FALSE)
               rownames(set) <- rownames(set, do.NULL = FALSE, prefix = paste(paste("set", sn , sep = ""), "alt", sep = "."))
               colnames(set) <- c(rowcol[[2]], paste("par", 1:(ncol(set) - n.cte), sep = "."))
               fulldes <<- rbind(fulldes, set)
             }
           }
           # Transform coded set to attribute level character set.
-          choice.set <- Decode(des = set, lvl.names = lvl.names, coding = coding, alt.cte = alt.cte, c.lvls = c.lvls)[[1]]
+          choice.set <- Decode(des = set, n.alts = n.alts, lvl.names = lvl.names, coding = coding, 
+                               alt.cte = alt.cte, c.lvls = c.lvls, no.choice = no.choice)[[1]]
           choice.set <- t(choice.set[ , 1:n.atts])
           # Fill in attribute names and alternatives names
           colnames(choice.set) <- alts
@@ -511,6 +509,8 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
 #'   attribute. See also \code{\link{Profiles}}.
 #' @param alt.cte A binary vector indicating for each alternative if an 
 #'   alternative specific constant is present. The default is \code{NULL}.
+#' @param no.choice An integer indicating the no choice alternative. The default
+#'   is \code{NULL}.
 #' @inheritParams Profiles
 #' @inheritParams Modfed
 #' @return \item{design}{A character matrix which represents the design.} 
@@ -543,12 +543,44 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
 #' Decode(des = design, lvl.names = al, coding = c, alt.cte = c(1, 1, 0)) 
 #' }
 #' @export
-Decode <- function(des, lvl.names, coding, alt.cte = NULL, c.lvls = NULL) {
+Decode <- function(des, n.alts, lvl.names, coding, alt.cte = NULL, c.lvls = NULL, no.choice = NULL) {
+  n.sets <- nrow(des) / n.alts
+  if(!isTRUE(all.equal(n.sets %% 1, 0))){
+    stop("'n.alts' does not seem correct based on nrow(des)")
+  }
+  if(!is.list(lvl.names)){
+    stop("'lvl.names' should be a list")
+  }
+  if(!is.matrix(des)){
+    stop("'des' should be a matrix")
+  }
   if(!is.null(alt.cte)) {
+    if(!isTRUE(all.equal(length(alt.cte), n.alts))){
+      stop("the length of 'alt.cte' does not match 'n.alts'")
+    }
     contins <- which(alt.cte == 1)
     if( !length(contins) == 0) {
       des <- des[, -(1:length(contins))]
     }
+  }
+  if(!is.null(no.choice)){
+    if(!is.numeric(no.choice)){
+      stop("'no.choice' should be an integer indicating the no choice alternative.")
+    }
+    if(!no.choice %% 1 == 0){
+      stop("'no.choice' should be an integer")
+    }
+    if(any(isTRUE(no.choice > (n.alts + 0.2)), isTRUE(no.choice < 0.2))){
+      stop("'no.choice' does not indicate one of the alternatives")
+    }
+    if(!isTRUE(all.equal(alt.cte[no.choice], 1))){
+      stop("the location of the 'no.choice' option in the 'alt.cte' vector should correspond with 1")
+    }
+    ncsek <- 1:nrow(des)
+    ncsek <- ncsek[-seq(no.choice, (n.sets * no.choice), no.choice)] 
+    #des <- des[-ncsek, ]
+  } else {
+    ncsek <- 1:nrow(des)
   }
   N.alts <- nrow(des) # Number of total alternatives.
   n.att <- length(lvl.names) # Number of attributes.
@@ -566,16 +598,17 @@ Decode <- function(des, lvl.names, coding, alt.cte = NULL, c.lvls = NULL) {
   m <- matrix(data = NA, nrow = N.alts, ncol = n.att)
   # Error handling
   if (ncol(des) != ncol(dc)) {
-    stop("Number of columns of 'des' does not equal the expected number based on the other arguments.")
+    stop("ncol(des) does not equal the expected number based on 'lvl.names' and 'alt.cte'.")
   }
   # For each alternative look for matching profile  
-  for (i in 1:N.alts) {
+  for (i in ncsek) {
     # if coded choice des, look for match in coded version first, then take uncoded equivalent.
     lev.num <- d[as.numeric(which(apply(dc, 1, function(x) all(x == des[i, ])))), ]
     lev.num <- as.numeric(lev.num)
     # Error handling
     if (any(is.na(lev.num))) { 
-      stop("The 'des' does not match with the type of 'coding' provided")
+      stop("alternatives detected that do not match with the type of 'coding' provided. 
+           Make sure 'no.choice' is specified if applicable.")
     }
     # For each attribute fill in the attribute level name
     for (c in 1:n.att) {m[i, c] <- lvl.names[[c]][lev.num[c]]}
@@ -589,8 +622,6 @@ Decode <- function(des, lvl.names, coding, alt.cte = NULL, c.lvls = NULL) {
   rownames(m) <- rownames(des)
   return(list("design" = as.data.frame(m), "lvl.balance" = lvl.balance))
 }
-
-
 
 # Character vector to binary vector.
 # 

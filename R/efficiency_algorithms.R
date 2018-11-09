@@ -122,6 +122,18 @@ Modfed <- function(cand.set, n.sets, n.alts, par.draws, alt.cte = NULL, no.choic
   if (!all(alt.cte %in% c(0, 1))){
     stop("'alt.cte' should only contain zero or ones.")
   }
+  #if no.choice
+  if(!is.logical(no.choice)){
+    stop("'no.choice' should be TRUE or FALSE")
+  }
+  if(no.choice){
+   if(!isTRUE(all.equal(alt.cte[n.alts], 1))){
+     stop("if 'no.choice' is TRUE, alt.cte[n.alts] should equal 1.")
+   }
+    ncsek <- seq(n.alts, (n.sets * n.alts), n.alts) 
+  } else {
+    ncsek <- NULL
+  }
   # Handling par.draws with alternative specific contstants.
   if(isTRUE(all.equal(n.cte, 1))){
     if(!(is.list(par.draws))){stop("par.draws should be a list")}
@@ -221,6 +233,9 @@ Modfed <- function(cand.set, n.sets, n.alts, par.draws, alt.cte = NULL, no.choic
       for (i in 1:nr.starts){
         r <- round(stats::runif((n.sets * n.alts), 1, nrow(cand.set)))
         start.des[[i]] <- cbind(cte.des, data.matrix(cand.set[r, ]))
+        if(no.choice){
+          start.des[[i]][ncsek, (ncol(cte.des) + 1) : (ncol(cte.des) + ncol(cand.set))] <- c(rep(0, ncol(cand.set)))
+        }
       }
       d.start <- lapply(start.des, StartDB, par.draws, n.alts)
       if(any(is.finite(unlist(lapply(d.start, mean, na.rm = TRUE))))){
@@ -232,12 +247,12 @@ Modfed <- function(cand.set, n.sets, n.alts, par.draws, alt.cte = NULL, no.choic
     ########
     no_cores <- parallel::detectCores() - 1
     cl <- parallel::makeCluster(no_cores)
-    parallel::clusterExport(cl, c("n.sets", "par.draws", "cand.set", "n.alts", "n.cte", "alt.cte", "no.choice", "max.iter"), envir = environment())
-    deslist <- parallel::parLapply(cl, start.des, Modfedje_ucpp, par.draws, cand.set, n.alts, n.sets, n.cte, alt.cte, no.choice, max.iter)
+    parallel::clusterExport(cl, c("n.sets", "par.draws", "cand.set", "n.alts", "n.cte", "alt.cte", "no.choice", "max.iter","ncsek"), envir = environment())
+    deslist <- parallel::parLapply(cl, start.des, Modfedje_ucpp, par.draws, cand.set, n.alts, n.sets, n.cte, alt.cte, no.choice, max.iter, ncsek)
     parallel::stopCluster(cl)
     ########
   } else {
-    deslist <- lapply(start.des, Modfedje_ucpp, par.draws, cand.set, n.alts, n.sets, n.cte, alt.cte, no.choice, max.iter = max.iter)
+    deslist <- lapply(start.des, Modfedje_ucpp, par.draws, cand.set, n.alts, n.sets, n.cte, alt.cte, no.choice, max.iter = max.iter, ncsek)
   }                                 
   bestdes <- deslist[[which.min(unlist(lapply(deslist, function(x) (x$error))))]]
   
@@ -246,7 +261,7 @@ Modfed <- function(cand.set, n.sets, n.alts, par.draws, alt.cte = NULL, no.choic
 
 # Core of the Modfed algorithm
 Modfedje_ucpp <- function(desje, par.draws, cand.set, n.alts, n.sets, n.cte, alt.cte,
-                          no.choice, max.iter){
+                          no.choice, max.iter, ncsek){
   converge <- FALSE
   change <- FALSE
   it <- 1
@@ -259,7 +274,11 @@ Modfedje_ucpp <- function(desje, par.draws, cand.set, n.alts, n.sets, n.cte, alt
     # save design before iteration.
     iter.des <- desje
     # For every row in the design.
-    for (r in 1:nrow(desje)) {
+    sek <- 1 : nrow(desje)
+    if (no.choice){
+      sek <- sek[-ncsek]
+    }
+    for (r in sek) {
       # Switch with everey row in candidate set. 
       db <- numeric(nrow(cand.set))
       for (c in 1:nrow(cand.set)) {
@@ -301,16 +320,15 @@ Modfedje_ucpp <- function(desje, par.draws, cand.set, n.alts, n.sets, n.cte, alt
   pmat <- matrix(rowMeans(ub), ncol = n.alts, byrow = TRUE)
   rownames(pmat) <- paste("set", 1:n.sets, sep = "")
   colnames(pmat) <- paste(paste("Pr(", paste("alt", 1:n.alts, sep = ""), sep = ""), ")", sep= "")
+  if(no.choice){
+    colnames(pmat)[n.alts] <- "Pr(no choice)"
+  }
   # Rownames design. 
-  des.names <- Rcnames(n.sets = n.sets, n.alts = n.alts, alt.cte = alt.cte)
+  des.names <- Rcnames(n.sets = n.sets, n.alts = n.alts, alt.cte = alt.cte, no.choice = no.choice)
   rownames(desje) <- des.names[[1]]
   # Colnames alternative specific constants. 
   if (n.cte != 0 && !is.null(colnames(desje))) {
     colnames(desje)[1:n.cte] <- des.names[[2]]
-  }
-  #opt out 
-  if(no.choice){
-    desje <- Optout(des = desje, n.alts = n.alts, alt.cte = alt.cte, n.sets = n.sets)
   }
   # Return design, D(B)error, percentage NA's, utility balance. 
   return(list("design" = desje, "error" =  db.start, "inf.error" = na.percentage, "probs" = pmat))
@@ -370,10 +388,12 @@ Modfedje_ucpp <- function(desje, par.draws, cand.set, n.alts, n.sets, n.cte, alt
 #'   \code{NULL}, See also \code{\link{ImpsampMNL}}.
 #' @param parallel Logical value indicating whether computations should be done 
 #'   over multiple cores.
+#' @param no.choice An integer indicating the no choice alternative. The default
+#'   is \code{NULL}.
 #' @param reduce Logical value indicating whether the candidate set should be 
 #'   reduced or not.
 #' @return \item{set}{A matrix representing a DB efficient choice set.} 
-#'   \item{db.error}{A numeric value indicating the DB-error of the whole 
+#'   \item{error}{A numeric value indicating the DB-error of the whole 
 #'   design.}
 #' @importFrom Rdpack reprompt
 #' @references \insertRef{ju}{idefix}
@@ -409,6 +429,9 @@ SeqDB <- function(des = NULL, cand.set, n.alts, par.draws, prior.covar, alt.cte 
   if (is.null(des)) {
     n.sets <- 1L
   } else { 
+    if(!is.matrix(des)){
+      stop("'des' should be a matrix or NULL")
+    }
     if (!isTRUE(nrow(des) %% n.alts == 0)) {
       stop("'n.alts' does not seem to match with the number of rows in 'des'")
     }
@@ -431,18 +454,24 @@ SeqDB <- function(des = NULL, cand.set, n.alts, par.draws, prior.covar, alt.cte 
   }
   #if no.choice
   if(!is.null(no.choice)){
-    if(!no.choice %% 1 == 0){
-      stop("'no.choice' should be an integer")
+    if(!is.wholenumber(no.choice)){
+      stop("'no.choice' should be an integer or NULL")
     }
     if(any(isTRUE(no.choice > (n.alts + 0.2)), isTRUE(no.choice < 0.2))){
       stop("'no.choice' does not indicate one of the alternatives")
+    }
+    if(is.null(alt.cte)){
+      stop("if there is a no choice alternative, 'alt.cte' should be specified")
+    }
+    if(!isTRUE(all.equal(alt.cte[no.choice], 1))){
+      stop("the no choice alternative should correspond with a 1 in 'alt.cte'")
     }
   }
   if(!is.null(alt.cte)){
     #prior.covar
     if(!isTRUE(all.equal(ncol(prior.covar), (ncol(cand.set) + n.cte)))){
       stop("number of columns of 'prior.covar' does not equal 
-           the total number of parameters (including 'alt.cte')")
+           the number of columns in 'cand.set' + nonzero elements in 'alt.cte'")
     }
     if(isTRUE(all.equal(n.cte, 1))){
       if(!is.list(par.draws)){stop("'par.draws' should be a list when 'alt.cte' is not NULL")}
@@ -547,7 +576,7 @@ SeqDB <- function(des = NULL, cand.set, n.alts, par.draws, prior.covar, alt.cte 
     row.names(set) <- NULL
     db <- min(dbs)
     #return best set and db error design.
-    return(list(set = set, db.error = db))
+    return(list("set" = set, "error" = db))
   }
   
   if(is.null(des)){
@@ -588,7 +617,7 @@ SeqDB <- function(des = NULL, cand.set, n.alts, par.draws, prior.covar, alt.cte 
     row.names(set) <- NULL
     db <- min(dbs)
     #return best set and db error design.
-    return(list(set = set, db.error = db))
+    return(list("set" = set, "error" = db))
   }
     }
 
@@ -669,4 +698,6 @@ SeqDB <- function(des = NULL, cand.set, n.alts, par.draws, prior.covar, alt.cte 
 #   # return.
 #   return(list(set = set, kl = max(kl.infos)))
 # }
+
+
 
