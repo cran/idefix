@@ -7,7 +7,7 @@
 #' MNL likelihood.
 #' 
 #' For the proposal distribution a t-distribution with degrees of freedom equal 
-#' to the number of parameters is used. The mode is estimated using 
+#' to the number of parameters is used. The posterior mode is estimated using 
 #' \code{\link[stats]{optim}}, and the covariance matrix is calculated as the negative 
 #' inverse of the generalized Fisher information matrix. See reference for more
 #' information.
@@ -18,12 +18,12 @@
 #' generated untill \code{n.draws} is reached. The covariance matrix is in this case
 #' still calculated as if no truncation was present.
 #' 
-#' @inheritParams SeqDB
-#' @param n.draws numeric value indicating the number of draws. 
+#' @inheritParams SeqMOD
+#' @param n.draws Numeric value indicating the number of draws. 
 #' @param prior.mean Numeric vector indicating the mean of the multivariate
 #'   normal distribution (prior).
 #' @param y A binary response vector. \code{\link{RespondMNL}} can be used to
-#'   simulate respons data.
+#'   simulate response data.
 #' @param lower Numeric vector of lower truncation points, the default
 #'   is \code{NULL}.
 #' @param upper Numeric vector of upper truncation points, the default
@@ -137,9 +137,9 @@ ImpsampMNL <- function(n.draws, prior.mean, prior.covar, des, n.alts, y,
     n.cte <- 0
   }
   # mode imp dens 
-  maxest <- stats::optim(par = prior.mean, LogPost, lower2 = lower, upper2 = upper, prior.mean = prior.mean, prior.covar = prior.covar, 
-                  des = des, y = y, n.alts = n.alts, lower = lower, upper = upper, 
-                  method = "L-BFGS-B", hessian = FALSE)$par
+  maxest <- stats::optim(par = prior.mean, LogPost, lower2 = lower, upper2 = upper, prior.mean = prior.mean, 
+                         prior.covar = prior.covar, des = des, y = y, n.alts = n.alts, lower = lower, upper = upper, 
+                         method = "L-BFGS-B", hessian = FALSE)$par
   # covar imp dens 
   hess <- Hessian(par = maxest, des = des, prior.covar = prior.covar, n.alts = n.alts)
   g.covar <- -solve(hess)

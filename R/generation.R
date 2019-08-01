@@ -12,16 +12,16 @@
 #' to that attribute. For \code{E} (effect coding) \code{\link{contr.sum}} will
 #' be applied.
 #' 
-#' @param lvls  A numeric vector which contains for each attribute, the number
+#' @param lvls  A numeric vector which contains for each attribute the number
 #'   of levels.
-#' @param coding Type op coding that needs to be used for each attribute.
-#' @param c.lvls A list containing numeric vectors with the attributelevels for
+#' @param coding Type of coding that needs to be used for each attribute.
+#' @param c.lvls A list containing numeric vectors with the attribute levels for
 #'   each continuous attribute. The default is \code{NULL}.
 #' @return A numeric matrix which contains all possible profiles.
 #' @examples 
 #' # Without continuous attributes
 #' at.lvls <- c(3, 4, 2) # 3 Attributes with respectively 3, 4 and 2 levels. 
-#' c.type <- rep("E", length(at.lvls)) # All Effect coded.
+#' c.type <- c("E", "E", "E") # All Effect coded.
 #' Profiles(lvls = at.lvls, coding = c.type) # Generate profiles.
 #' 
 #' # With continuous attributes 
@@ -37,8 +37,9 @@ Profiles <- function(lvls, coding, c.lvls = NULL) {
   contins <-  which(coding == "C")
   n.contins <-  length(contins)
   # error continuous levels 
-  if (!is.null(c.lvls) && !is.list(c.lvls)) { 
-    stop('c.lvls should be a list.')
+  if (!is.null(c.lvls)){ 
+    if(!is.list(c.lvls)){stop("'c.lvls' should be a list.")}
+    if(!is.numeric(unlist(c.lvls))){stop("components of 'c.lvls' should be numeric")}
   }
   # Error correct coding types.
   codings.types <- c("E", "D", "C")
@@ -123,7 +124,7 @@ Rcnames <- function(n.sets, n.alts, alt.cte, no.choice) {
   } else {
     cte.names <- NULL
   }
-    # return
+  # return
   return(list(r.names, cte.names))
 }
 
@@ -240,7 +241,7 @@ Lattice_trunc <- function (n, mean, cvar, lower, upper, df) {
   A <- chol(cvar)
   XX <- NULL
   while(left > 0.2){
-    m = ceiling(sqrt(left))
+    m = ceiling(log(left)/log(2))
     if(m < 2){m = 2}
     lattice <- Lat(K = dim, b = 2, m = m)
     X <- matrix(NA, nrow(lattice), dim)

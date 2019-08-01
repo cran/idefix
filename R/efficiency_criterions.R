@@ -8,6 +8,7 @@
 #' @param des A design matrix in which each row is an alternative.
 #' @param n.alts Numeric value indicating the number of alternatives per choice
 #'   set.
+#' @param mean A logical value indicating whether the mean (DB) error should be returned or not. Default = TRUE. 
 #' @param weights A numeric vector containing weights of \code{par.draws}. The
 #'   default is \code{NULL}.
 #' @return Numeric value indicating the DB-error of the design given the
@@ -26,10 +27,10 @@
 #' DBerr(par.draws = par.draws, des = des, n.alts = n.alts)
 #' @importFrom Rdpack reprompt
 #' @export
-DBerr <- function(par.draws, des, n.alts, weights = NULL) {
+DBerr <- function(par.draws, des, n.alts, weights = NULL, mean = TRUE) {
   if(is.list(par.draws)){
     if (!isTRUE(all.equal(length(par.draws), 2))){
-      stop("'par.draws' should contain two components")
+      stop("If 'par.draws' is a list, it should contain two components")
     }
     if(!(all(unlist(lapply(par.draws, is.matrix))))){
       stop("'par.draws' should contain two matrices")
@@ -70,9 +71,16 @@ DBerr <- function(par.draws, des, n.alts, weights = NULL) {
   } else {
     weights <- rep(1, nrow(par.draws))
   }
+  if (!is.logical(mean)){
+    stop("'mean' should be TRUE or FALSE") 
+  }
   d.errors <- apply(par.draws, 1, Derr_ucpp, des, n.alts)
-  # DB-error. 
-  error <- mean(d.errors, na.rm = TRUE)
+  # DB-error.
+  if(isTRUE(mean)){
+    error <- mean(d.errors, na.rm = TRUE)
+  } else {
+    error <- d.errors
+  }
   return("DBerror" = error)
 }
 
@@ -176,6 +184,21 @@ InfoDes <- function(par, des, n.alts) {
   return(info.des)
 }
 
+# Infodes joined with utility balance function
+# InfoDes2 <- function(par, des, n.alts, utbal = NULL) {
+#   group <- rep(seq(1, nrow(des) / n.alts, 1), each = n.alts)
+#   # probability
+#   u <- des %*% diag(par)
+#   u <- .rowSums(u, m = nrow(des), n = length(par))
+#   p <- exp(u) / rep(rowsum(exp(u), group), each = n.alts)
+#   if (isTRUE(utbal)) {
+#     return(p)
+#   } else {
+#     # information matrix
+#     info.des <- crossprod(des * p, des) - crossprod(rowsum( des * p, group))
+#     return(info.des)
+#   }
+# } 
 
 # Utility balance 
 Utbal <- function(par, des, n.alts) { 
@@ -187,47 +210,47 @@ Utbal <- function(par, des, n.alts) {
   return(p)
 }
 
-# # KL information
-# # 
-# # Calculates the Kullback-Leibler divergence for all posible choice sets, given
-# # @inheritParams SeqDB
-# # @param full.comb A matrix in which each row is a possible combination of
-# #   profiles.
-# # @return Numeric value indicating the Kullback-Leibler divergence.
-# KLs <- function(full.comb, par.draws, cte.des, cand.set, weights) {
-#   #take set
-#   set <- as.matrix(cand.set[as.numeric(full.comb), ])
-#   #Alternative specific constants 
-#   set <- cbind(cte.des, set)
-#   #calculate for all sets the KLinfo.
-#   kl <- KL(set, par.draws, weights)
-#   return(kl)
-# }
+# KL information
+#
+# Calculates the Kullback-Leibler divergence for all posible choice sets, given
+# @inheritParams SeqMOD
+# @param full.comb A matrix in which each row is a possible combination of
+#   profiles.
+# @return Numeric value indicating the Kullback-Leibler divergence.
+KLs <- function(full.comb, par.draws, cte.des, cand.set, weights) {
+  #take set
+  set <- as.matrix(cand.set[as.numeric(full.comb), ])
+  #Alternative specific constants
+  set <- cbind(cte.des, set)
+  #calculate for all sets the KLinfo.
+  kl <- KL(set, par.draws, weights)
+  return(kl)
+}
 
 
-# # Kullback-Leibler divergence for a set
-# # 
-# # Calculates the KL-divergence for a choice set given parameter values.
-# # @inheritParams DerrS
-# # @param weights A vector containing the weights of the draws. Default is
-# #   \code{NULL}
-# KL <- function (set, par.draws, weights){
-#   # Probabilities.
-#   num2 <- tcrossprod(set, par.draws)
-#   mmat2 <- as.matrix(t(apply(num2, 2, max)))
-#   numm2 <- exp(sweep(num2, 2, mmat2, FUN = "-"))
-#   nummax <- exp(sweep(num2, 2, mmat2, FUN = "-"))
-#   denom <- colSums(numm2)
-#   ps <- sweep(nummax, 2, denom, FUN = "/")
-#   lgp <- log(ps)
-#   wprob <- sweep(ps, 2, weights, FUN="*")
-#   twp <- rowSums(wprob)
-#   lgwp <- sweep(lgp, 2, weights, FUN="*")
-#   tlwp <- rowSums(lgwp)
-#   #kullback Leibler information
-#   klinfo <- sum(twp * (log(twp) - tlwp))
-#   return (as.numeric(klinfo))
-# }
+# Kullback-Leibler divergence for a set
+#
+# Calculates the KL-divergence for a choice set given parameter values.
+# @inheritParams DerrS
+# @param weights A vector containing the weights of the draws. Default is
+#   \code{NULL}
+KL <- function (set, par.draws, weights){
+  # Probabilities.
+  num2 <- tcrossprod(set, par.draws)
+  mmat2 <- as.matrix(t(apply(num2, 2, max)))
+  numm2 <- exp(sweep(num2, 2, mmat2, FUN = "-"))
+  nummax <- exp(sweep(num2, 2, mmat2, FUN = "-"))
+  denom <- colSums(numm2)
+  ps <- sweep(nummax, 2, denom, FUN = "/")
+  lgp <- log(ps)
+  wprob <- sweep(ps, 2, weights, FUN="*")
+  twp <- rowSums(wprob)
+  lgwp <- sweep(lgp, 2, weights, FUN="*")
+  tlwp <- rowSums(lgwp)
+  #kullback Leibler information
+  klinfo <- sum(twp * (log(twp) - tlwp))
+  return (as.numeric(klinfo))
+}
 
 
 

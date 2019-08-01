@@ -24,7 +24,7 @@ profile.}
 level of each attribute.}
 
 \item{coding}{A character vector denoting the type of coding used for each
-attribute. See also \code{\link{Profiles}}.}
+attribute. See also \code{\link[idefix]{Profiles}}.}
 
 \item{alt.cte}{A binary vector indicating for each alternative if an
 alternative specific constant is present. The default is \code{NULL}.}
@@ -44,7 +44,7 @@ survey.}
 \item{data.dir}{A character string with the directory denoting where the data
 needs to be written. The default is NULL}
 
-\item{c.lvls}{A list containing numeric vectors with the attributelevels for
+\item{c.lvls}{A list containing numeric vectors with the attribute levels for
 each continuous attribute. The default is \code{NULL}.}
 
 \item{prior.mean}{Numeric vector indicating the mean of the multivariate
@@ -53,9 +53,9 @@ normal distribution (prior).}
 \item{prior.covar}{Covariance matrix of the prior distribution.}
 
 \item{cand.set}{A numeric matrix in which each row is a possible profile. The
-\code{\link{Profiles}} function can be used to generate this.}
+\code{\link{Profiles}} function can be used to generate this matrix.}
 
-\item{n.draws}{numeric value indicating the number of draws.}
+\item{n.draws}{Numeric value indicating the number of draws.}
 
 \item{lower}{Numeric vector of lower truncation points, the default
 is \code{NULL}.}
@@ -86,20 +86,20 @@ can be generated sequentially adaptively, or can be a combination of both.
 }
 \details{
 A pregenerated design can be specified in \code{des}. This should be a matrix
-in which each row is a profile. This can be generated with \code{\link{Modfed}}, but
-is not necesarry.
+in which each row is a profile. This can be generated with \code{\link{Modfed}}
+or  \code{\link{CEA}}, but it is not necessary.
 
 If \code{n.total} = \code{nrow(des)} / \code{length(alts)}, the specified
 design will be put on screen, one set after the other, and the responses will
 be saved. If \code{n.total} > (\code{nrow(des)} / \code{length(alts)}), first
 the specified design will be shown and afterwards the remaining sets will be
 generated adaptively. If \code{des} = \code{NULL}, \code{n.total} sets will be
-generated adaptively. See \code{\link{SeqDB}} for more information on adaptive
+generated adaptively. See \code{\link{SeqMOD}} for more information on adaptive
 choice sets.
 
 Whenever adaptive sets will be generated, \code{prior.mean},
 \code{prior.covar}, \code{cand.set} and \code{n.draws}, should be specified.
-These arguments are necesarry for the underlying importance sampling algorithm
+These arguments are necessary for the underlying importance sampling algorithm
 to update the prior preference distribution. \code{lower} and \code{upper} can
 be used to specify lower and upper truncation points. See
 \code{\link{ImpsampMNL}} for more details.
@@ -125,8 +125,8 @@ is present in \code{des}, or is desired when generating adaptive choice sets,
 indicating which alternative is the no choice option. This alternative will
 not be presented on screen, but the option to select "no choice" will be. The
 \code{alt.cte} argument should be specified accordingly, namely with a
-\code{1} on the location of the \code{no.choice} option. See examples for an
-example.
+\code{1} on the location of the \code{no.choice} option. See examples for
+illustration.
 
 When \code{parallel} is \code{TRUE}, \code{\link[parallel]{detectCores}} will
 be used to decide upon the number of available cores. That number minus 1
@@ -190,11 +190,12 @@ p.mean <- c(0.3, 0.7, 0.3, 0.7, 0.3, 0.7)
 p.var <- diag(length(p.mean))
 dataDir <- getwd()
 # Display the survey 
-SurveyApp(des = xdes, n.total = n.sets, alts = alternatives, atts = 
-attributes, lvl.names = labels, coding = code, buttons.text = b.text, 
-intro.text = i.text, end.text = e.text, crit= "DB", prior.mean = p.mean,
-prior.covar = p.var, cand.set = cand, n = 50)
-
+SurveyApp(des = xdes, n.total = n.sets, alts = alternatives, 
+          atts = attributes, lvl.names = labels, coding = code, 
+          buttons.text = b.text, intro.text = i.text, end.text = e.text, 
+          prior.mean = p.mean, prior.covar = p.var, cand.set = cand, 
+          n.draws = 50)
+          
 #### Choice design with only adaptive sets (des=NULL)
 # setting for adaptive sets 
 levels <- c(3, 3, 3)
@@ -217,12 +218,18 @@ b.text <- "Please choose the alternative you prefer"
 e.text <- "Thanks for taking the survey"
 dataDir <- getwd()
 # Display the survey 
-SurveyApp (des = NULL, n.total = n.sets, alts = alternatives, atts =
-attributes, lvl.names = labels, coding = code, buttons.text = b.text,
-intro.text = i.text, end.text = e.text, crit= "KL", prior.mean = p.mean,
-prior.covar = p.var, cand.set = cand, lower = low, upper = up, n = 50) 
-
-
+SurveyApp(des = NULL, n.total = n.sets, alts = alternatives,
+          atts = attributes, lvl.names = labels, coding = code, 
+          buttons.text = b.text, intro.text = i.text, end.text = e.text, 
+          prior.mean = p.mean, prior.covar = p.var, cand.set = cand, 
+          lower = low, upper = up, n.draws = 50)
+# If CEA algorithm is desired, cand.set argument is not needed
+SurveyApp(des = NULL, n.total = n.sets, alts = alternatives,
+         atts = attributes, lvl.names = labels, coding = code, 
+         buttons.text = b.text, intro.text = i.text, end.text = e.text, 
+         prior.mean = p.mean, prior.covar = p.var, 
+         lower = low, upper = up, n.draws = 50)
+         
 #### Present choice design with a no choice alternative.
 # example design 
 data("nochoice_design") # pregenerated design
@@ -241,10 +248,11 @@ i.text <- "Welcome, here are some instructions ... good luck!"
 b.text <- "Please choose the alternative you prefer"
 e.text <- "Thanks for taking the survey"
 
-SurveyApp (des = xdes, n.total = n.sets, alts = alternatives, 
+# Display the survey 
+SurveyApp(des = xdes, n.total = n.sets, alts = alternatives, 
           atts = attributes, lvl.names = labels, coding = code, 
           buttons.text = b.text, intro.text = i.text, end.text = e.text,
-          no.choice = 3, alt.cte = c(0 , 0, 1))
+          no.choice = 3, alt.cte = c(0, 0, 1))
 }
 }
 \references{
