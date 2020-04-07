@@ -1,7 +1,7 @@
 Package: idefix
 Type: Package
 Title: Efficient Designs for Discrete Choice Experiments
-Version: 0.4.0
+Version: 0.4.3
 Authors@R: c(
     person("Frits", "Traets", email = "frits.traets@kuleuven.be", role = c("aut", "cre")),
     person("Daniel", "Gil", email = "danielgils@gmail.com", role = "ctb"))
@@ -20,8 +20,8 @@ RdMacros: Rdpack
 URL: https://github.com/traets/idefix
 Suggests: testthat
 NeedsCompilation: yes
-Packaged: 2019-08-01 15:35:05 UTC; u0105757
+Packaged: 2020-04-07 11:51:21 UTC; u0105757
 Author: Frits Traets [aut, cre],
   Daniel Gil [ctb]
 Repository: CRAN
-Date/Publication: 2019-08-01 16:40:12 UTC
+Date/Publication: 2020-04-07 14:40:05 UTC
