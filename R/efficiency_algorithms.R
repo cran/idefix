@@ -102,6 +102,7 @@
 #'}
 #' @importFrom Rdpack reprompt 
 #' @importFrom MASS mvrnorm
+#' @references \insertRef{idefix}{idefix}
 #' @export
 Modfed <- function(cand.set, n.sets, n.alts, par.draws, alt.cte = NULL, no.choice = FALSE, 
                    start.des = NULL, parallel = TRUE, max.iter = Inf, n.start = 12,
@@ -422,6 +423,7 @@ Modfedje_ucpp <- function(desje, par.draws, cand.set, n.alts, n.sets, n.cte, alt
 #'   \item{error}{A numeric value indicating the DB-error of the whole 
 #'   design.}
 #' @importFrom Rdpack reprompt
+#' @references \insertRef{idefix}{idefix}
 #' @references \insertRef{ju}{idefix}
 #' @examples 
 #' # DB efficient choice set, given a design and parameter draws. 

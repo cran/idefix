@@ -544,6 +544,7 @@ CEAcore_ucpp <- function(des, par.draws, levels.list, n.alts, n.sets, n.cte,
 #'   \item{error}{A numeric value indicating the DB-error of the whole 
 #'   design.}
 #' @importFrom Rdpack reprompt
+#' @references \insertRef{idefix}{idefix}
 #' @references \insertRef{ju}{idefix}
 #' @references \insertRef{cea}{idefix}
 #' @references \insertRef{cea_discrete}{idefix}
