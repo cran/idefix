@@ -2,11 +2,21 @@
 % Please edit documentation in R/efficiency_algorithms.R
 \name{Modfed}
 \alias{Modfed}
-\title{Modified Federov algorithm for MNL models.}
+\title{Modified Fedorov algorithm for MNL models.}
 \usage{
-Modfed(cand.set, n.sets, n.alts, par.draws, alt.cte = NULL,
-  no.choice = FALSE, start.des = NULL, parallel = TRUE,
-  max.iter = Inf, n.start = 12, best = TRUE)
+Modfed(
+  cand.set,
+  n.sets,
+  n.alts,
+  par.draws,
+  alt.cte = NULL,
+  no.choice = FALSE,
+  start.des = NULL,
+  parallel = TRUE,
+  max.iter = Inf,
+  n.start = 12,
+  best = TRUE
+)
 }
 \arguments{
 \item{cand.set}{A numeric matrix in which each row is a possible profile. The

@@ -1,6 +1,6 @@
 
 
-#' Modified Federov algorithm for MNL models.
+#' Modified Fedorov algorithm for MNL models.
 #' 
 #' The algorithm swaps every profile of an initial start design with candidate 
 #' profiles. By doing this, it tries to minimize the D(B)-error, based on a 

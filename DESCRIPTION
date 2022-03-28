@@ -1,7 +1,7 @@
 Package: idefix
 Type: Package
 Title: Efficient Designs for Discrete Choice Experiments
-Version: 1.0.1
+Version: 1.0.3
 Authors@R: c(
     person("Frits", "Traets", email = "frits.traets@kuleuven.be", role = c("aut", "cre")),
     person("Daniel", "Gil", email = "danielgils@gmail.com", role = "ctb"))
@@ -11,17 +11,17 @@ License: GPL-3
 Depends: R (>= 3.1.1), shiny
 LazyData: TRUE
 ByteCompile: TRUE
-Imports: dplyr, MASS, mlogit, parallel, Rcpp (>= 0.12.18), Rdpack,
-        stats, scales, tmvtnorm, utils
-RoxygenNote: 6.1.1
+Imports: dplyr, MASS, parallel, Rcpp (>= 0.12.18), Rdpack, stats,
+        scales, tmvtnorm, utils, dfidx
+RoxygenNote: 7.1.2
 Encoding: UTF-8
 LinkingTo: Rcpp, RcppArmadillo
 RdMacros: Rdpack
 URL: https://github.com/traets/idefix
-Suggests: testthat
+Suggests: RSGHB, bayesm, testthat
 NeedsCompilation: yes
-Packaged: 2020-11-26 16:40:02 UTC; u0105757
+Packaged: 2022-03-28 08:41:08 UTC; u0105757
 Author: Frits Traets [aut, cre],
   Daniel Gil [ctb]
 Repository: CRAN
-Date/Publication: 2020-11-26 17:50:02 UTC
+Date/Publication: 2022-03-28 12:10:05 UTC
