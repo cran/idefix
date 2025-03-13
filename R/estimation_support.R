@@ -20,17 +20,23 @@
 #' assumed that every responded responded to the same number of choice sets.
 #' 
 #' @param pkg Indicates the desired estimation package. Options are 
-#'   \code{bayesm = \link[bayesm]{rhierMnlRwMixture}}, \code{RSGHB = \link[RSGHB]{doHB}}, 
-#'   \code{Mixed.Probit = \link[bayesm]{rbprobitGibbs}}, \code{mlogit = 
-#'   \link[mlogit]{mlogit}}, \code{logitr = \link[logitr]{logitr}}).
+#'   \code{RSGHB = \link[RSGHB]{doHB}}, \code{bayesm = \link[bayesm]{rhierMnlRwMixture}}, 
+#'   \code{bayesm::rbprobitGibbs = \link[bayesm]{rbprobitGibbs}} (previously, in package Mixed.Probit), 
+#'   \code{mlogit = \link[mlogit]{mlogit}}, \code{logitr = \link[logitr]{logitr}}, 
+#'   \code{Rchoice = \link[Rchoice]{Rchoice}}, \code{gmnl = \link[gmnl]{gmnl}}, 
+#'   \code{ChoiceModelR = \link[ChoiceModelR]{choicemodelr}}.
 #' @param des A design matrix in which each row is a profile.
 #' @inheritParams Modfed
 #' @param y A numeric vector containing binary or discrete responses. See \code{bin} argument.
 #' @param n.resp Numeric value indicating the number of respondents.
-#' @param bin Logical value indicating whether the reponse vector contains 
+#' @param bin Logical value indicating whether the response vector contains 
 #'   binary data (\code{TRUE}) or discrete data (\code{FALSE}). See \code{y} argument.
 #' @param alt.names A character vector containing the names of the alternatives.
-#'   The default = \code{NULL}
+#'   The default = \code{NULL}.
+#' @param lvls  A numeric vector which contains for each attribute the number
+#'   of levels. To be used only for package "ChoiceModelR". The default = \code{NULL}.
+#' @param coding Type of coding that needs to be used for each attribute. To be used only for package "ChoiceModelR".
+#'    The default = \code{NULL}.
 #' @return The data ready to be used by the specified package.
 #' @examples 
 #' idefix.data <- aggregate_design 
@@ -38,12 +44,15 @@
 #' y <- idefix.data[, 9]
 #' bayesm.data <- Datatrans(pkg = "bayesm", des = des, y = y, 
 #' n.alts = 2, n.sets = 8, n.resp = 7, bin = TRUE)
-#' Mix.pro.data <- Datatrans(pkg = "Mixed.Probit", des = des, y = y,
+#' rbprobit.data <- Datatrans(pkg = "bayesm::rbprobitGibbs", des = des, y = y,
 #'  n.alts = 2, n.sets = 8, n.resp = 7, bin = TRUE)
 #' mlogit.data <- Datatrans(pkg = "mlogit", des = des, y = y,
 #'  n.alts = 2, n.sets = 8, n.resp = 7, bin = TRUE)
+#' ChoiceM.data <- Datatrans(pkg = "ChoiceModelR", des = des, y = y,
+#'  n.alts = 2, n.sets = 8, n.resp = 7, bin = TRUE, coding = c("D", "D", "D"), lvls = c(3, 3, 3))
+#'  
 #' @export
-Datatrans <- function(pkg, des, y, n.alts, n.sets, n.resp, bin, alt.names = NULL) {
+Datatrans <- function(pkg, des, y, n.alts, n.sets, n.resp, bin, alt.names = NULL, coding = NULL, lvls = NULL) {
   ## Errors 
   #des
   if(!is.matrix(des)){stop("'des' should be a matrix")}
@@ -66,8 +75,8 @@ Datatrans <- function(pkg, des, y, n.alts, n.sets, n.resp, bin, alt.names = NULL
     }
   }
   #pkg
-  if(!pkg %in% c("bayesm", "ChoiceModelR", "RSGHB", "Mixed.Probit",
-                 "mlogit", "Rchoice", "logitr")){
+  if(!pkg %in% c("bayesm", "ChoiceModelR", "RSGHB", "Mixed.Probit", "bayesm::rbprobitGibbs",
+                 "mlogit", "Rchoice", "logitr", "gmnl")){
     stop("'pkg' argument is not recognized")
   }
   #alt.names
@@ -82,6 +91,11 @@ Datatrans <- function(pkg, des, y, n.alts, n.sets, n.resp, bin, alt.names = NULL
   ###########################
   # Bayesm package 
   if(pkg == "bayesm") {
+    
+    if (bin) {
+      y <- as.vector(DisBin(y, n.alts))
+    }
+      
     # Initialize
     lgtdata <- NULL
     ni <- rep(n.sets, n.resp)
@@ -90,11 +104,10 @@ Datatrans <- function(pkg, des, y, n.alts, n.sets, n.resp, bin, alt.names = NULL
     for (i in 1:n.resp) {
       # Obtain y
       ychoice <- NULL
-      ybeg <- n.sets * (i - 1) + 1
-      yend <- n.sets * i
-      for (c in 1:n.sets) {
-        ychoice[1:n.sets] <- y[ybeg:yend]
-      }
+      ybeg <- csa * (i - 1) + 1 
+      yend <- csa * i
+      ychoice[1:csa] <- y[ybeg:yend]
+      ychoice = data.matrix(ychoice)
       # Transform des into dataframe
       xmat <- NULL
       xbeg <- csa * (i - 1) + 1
@@ -138,29 +151,21 @@ Datatrans <- function(pkg, des, y, n.alts, n.sets, n.resp, bin, alt.names = NULL
     print("The dataset is ready to be used for RSGHB package")
     return(RSGHBdata)
   }
-  # Mixed Probit estimation.
-  if (pkg == "Mixed.Probit") {
-    # matrix y to 1 dim 
-    y <- as.vector(y)
-    y <- matrix(y, length(y))
-    
-    ynum <- nrow(y)
-    yind <- NULL
-    for (i in 1:ynum) {
-      zerotemp <- matrix(0, n.alts, 1)
-      index <- y[i, ]
-      zerotemp[index] <- 1
-      yind <- rbind(yind, zerotemp)
+  # bayesm::rbprobitGibbs (or Mixed Probit earlier) estimation.
+  if (pkg == "Mixed.Probit" | pkg == "bayesm::rbprobitGibbs") {
+    if(bin){
+      y <- as.vector(DisBin(y, n.alts))
     }
-    y <- array(t(yind), dim = c(n.alts, n.sets, n.resp))
-    des <- array(t(des), dim = c(n.par, n.alts, n.sets, n.resp))
-    mix.data <- list(y = y, X = des, nlgt = n.resp, nset = n.sets, n.alts = n.alts, nbeta = n.par)
-    
-    print("The dataset is ready to be used for Mixed Probit Estimation")
-    return(mix.data)
+    # Initialize
+    lgtdata <- NULL
+    ychoice = data.matrix(y)
+    xmat <- des
+    lgtdata <- list(y = ychoice, X = xmat)
+    print("The dataset is ready to be used for function bayesm::rbprobitGibbs")
+    return(lgtdata)
   } 
-  # mlogit package
-  if(pkg == "mlogit") {
+  # mlogit or gmnl package
+  if(pkg == "mlogit" | pkg == "gmnl") {
     # matrix y to 1 dim 
     if(is.null(alt.names)){
       alt.names <- vector(length = n.alts)
@@ -174,7 +179,12 @@ Datatrans <- function(pkg, des, y, n.alts, n.sets, n.resp, bin, alt.names = NULL
     mdes$Choice <- as.logical(Choice)
     rownames(mdes) <- NULL
     logitdata <- dfidx::dfidx(mdes, idx = list(c(NA, "id"), "alt.names"))
-    print("The dataset is ready to be used for mlogit package")
+    if(pkg == "mlogit") {
+      print("The dataset is ready to be used for mlogit package")
+      }  else if(pkg == "gmnl") {
+        class(logitdata) <- c(class(logitdata), "mlogit.data")
+        print("The dataset is ready to be used for gmnl package")
+    }
     return(logitdata) 
   }
   # Rchoice
@@ -200,6 +210,56 @@ Datatrans <- function(pkg, des, y, n.alts, n.sets, n.resp, bin, alt.names = NULL
     logitrdata <- as.data.frame(mat) 
     print("The dataset is ready to be used for logitr package")
     return(logitrdata)
+  }
+  if (pkg == "ChoiceModelR") {
+    
+    #Checks first for coding and lvls vectors
+    # Error lvls vector. At least 2 attributes
+    if (length(lvls) < 2 || (!(is.numeric(lvls)))) {
+      stop("lvls argument is incorrect.")
+    }
+    # Error correct coding types.
+    codings.types <- c("E", "D", "C")
+    if (!all(coding %in% codings.types) || (length(coding) != length(lvls))) {
+      stop("coding argument is incorrect.")
+    } 
+    
+    # transforming the design
+    setID <- rep(rep(1: n.sets, each = n.alts), n.resp)
+    id <- rep(1:n.resp, each = n.sets * n.alts)
+    alt <- rep(c(1:n.alts), n.sets * n.resp)
+    
+    #choice should refer to the chosen alternative, and it should be only in the first line of the choice set only
+    choice <- alt
+    choice[which(alt == 1)] <- as.vector(y)
+    choice[which(alt!=1)] <- 0
+    
+    #transformation of dummy and effect coded variables into single columns (and making sure there are no zeros for them as required by ChoiceModelR)
+    cols <- 1
+    labels <- vector(mode = "list", length(coding))
+    cont.cols <- 1
+    if (any(coding == "C")) {
+      c.lvls <- vector(mode = "list", length(which(coding=="C") ))
+      } else {c.lvls = NULL}
+    for (i in 1:length(coding)) {
+     if (coding[i] == "D" | coding[i] == "E") {
+      labels[[i]] <- as.character(c(1:lvls[i]))
+      cols <- cols + lvls[i] - 1
+     } else {
+       labels[[i]] <- as.character(unique(des[,cols])) #c(c(2:lvls[i]),1)
+       c.lvls[[cont.cols]] <- unique(des[,cols])
+       cols <- cols + 1
+       cont.cols <- cont.cols + 1
+     }
+    }
+    newdes <- as.matrix(as.data.frame(lapply((Decode(des = des, lvl.names = labels, coding = coding, n.alts = n.alts,c.lvls = c.lvls)$design),as.numeric)))
+    colnames(newdes) <- NULL
+
+    #
+    mat <- cbind(id, setID, alt, newdes, choice)
+    ChoiceModelRdata <- data.matrix(mat) 
+    print("The dataset is ready to be used for ChoiceModelR package")
+    return(ChoiceModelRdata)
   }
 }
 

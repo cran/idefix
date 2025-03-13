@@ -11,13 +11,17 @@ CEA(
   n.sets,
   n.alts,
   par.draws,
+  optim = "D",
   alt.cte = NULL,
   no.choice = FALSE,
   start.des = NULL,
   parallel = TRUE,
   max.iter = Inf,
   n.start = 12,
-  best = TRUE
+  overlap = NULL,
+  n.blocks = 1,
+  blocking.iter = 50,
+  constraints = NULL
 )
 }
 \arguments{
@@ -35,6 +39,9 @@ each continuous attribute. The default is \code{NULL}.}
 set.}
 
 \item{par.draws}{A matrix or a list, depending on \code{alt.cte}.}
+
+\item{optim}{A character value to choose between "D" and "A" optimality. The
+default is \code{"D"}.}
 
 \item{alt.cte}{A binary vector indicating for each alternative whether an
 alternative specific constant is desired. The default is \code{NULL}.}
@@ -54,52 +61,67 @@ iterations. The default is \code{Inf}.}
 \item{n.start}{A numeric value indicating the number of random start designs
 to use. The default is 12.}
 
-\item{best}{A logical value indicating whether only the best design should be
-returned. The default is \code{TRUE}.}
+\item{overlap}{A numeric value indicating the minimum number of attributes to overlap
+in every choice sets to create partial profiles. The default is \code{NULL}.}
+
+\item{n.blocks}{A numeric value indicating the desired number of blocks to
+create out of the most efficient design.}
+
+\item{blocking.iter}{A numeric value indicating the maximum number of iterations
+for optimising the blocks. The default value is 50.}
+
+\item{constraints}{A list of constraints to enforce on the attributes and alternatives
+in every choice set. The default is \code{NULL}.}
 }
 \value{
-If \code{best = TRUE} the design with the lowest D(B)-error is returned.
-If \code{best = FALSE}, the results of all (provided) start designs are
-returned. \item{design}{A
-numeric matrix wich contains an efficient design.} \item{error}{Numeric
-value indicating the D(B)-error of the design.} \item{inf.error}{Numeric
-value indicating the percentage of draws for which the D-error was
-\code{Inf}.} \item{probs}{Numeric matrix containing the probabilities of
-each alternative in each choice set. If a sample matrix was provided in
-\code{par.draws}, this is the average over all draws.}
+Two lists of designs and statistics are returned: First, the list \code{BestDesign} contains the design with the lowest A(B)- or D(B)- error. The method \code{print} can be used to return this list.
+Second, the list \code{AllDesigns} contains the results of all (provided) start designs. The method \code{summary} can be used to return this list.
+\item{design}{A numeric matrix wich contains an efficient design.}
+\item{optimality}{\code{"A"} or \code{"D"}, depending on the chosen optimality criteria.}
+\item{inf.error}{Numeric value indicating the percentage of draws for which the D-error was \code{Inf}.}
+\item{probs}{Numeric matrix containing the probabilities of each alternative
+in each choice set. If a sample matrix was provided in \code{par.draws},
+this is the average over all draws.}
+\item{AB.error}{Numeric value indicating the A(B)-error of the design.}
+\item{DB.error}{Numeric value indicating the D(B)-error of the design.}
+\item{SD}{The standard deviations of the parameters. Calculated by taking the diagonal of the varcov matrix, averaged over all draws if a sample matrix was provided in \code{par.draws}.}
+\item{level.count}{The count of all levels of each attribute in the design.}
+\item{level.overlap}{The count of overlapping levels accross alternatives in every choice set in the design.}
+\item{Orthogonality}{Numeric value indicating the degree of orthogonality of the design. The closer the value to 1, the more orthogonal the design is.}
+\item{Blocks}{A list showing the created blocks of the best design, along with the level counts in each block. For more details, see function \code{\link{Blocks}}.}
 }
 \description{
 The algorithm improves an initial start design by considering changes on an
-attribute-by-attribute basis. By doing this, it tries to minimize the
-D(B)-error based on a multinomial logit model. This routine is repeated for
+attribute-by-attribute basis. By doing this, it tries to minimize the chosen error
+(A(B) or D(B)-error) based on a multinomial logit model. This routine is repeated for
 multiple starting designs.
 }
 \details{
 Each iteration will loop through all profiles from the initial design,
-evaluating the change in D(B)-error for every level in each attribute.
-The algorithm stops when an iteration occured without replacing a profile or
-when \code{max.iter} is reached.
+evaluating the change in A(B) or D(B)-error (as specified) for every level
+in each attribute. The algorithm stops when an iteration occurred without
+replacing a profile or when \code{max.iter} is reached.
 
-By specifying a numeric vector in \code{par.draws}, the D-error will be
+By specifying a numeric vector in \code{par.draws}, the A- or D-error will be
 calculated and the design will be optimised locally. By specifying a matrix,
-in which each row is a draw from a multivariate distribution, the DB-error
+in which each row is a draw from a multivariate distribution, the AB/DB-error
 will be calculated, and the design will be optimised globally. Whenever there
 are alternative specific constants, \code{par.draws} should be a list
 containing two matrices: The first matrix containing the parameter draws for
 the alternative specific constant parameters. The second matrix containing
 the draws for the rest of the parameters.
 
-The DB-error is calculated by taking the mean over D-errors. It could be that
-for some draws the design results in an infinite D-error. The percentage of
-draws for which this was true for the final design can be found in the output
-\code{inf.error}.
+The AB/DB-error is calculated by taking the mean over A- / D-errors, respectively.
+It could be that for some draws the design results in an infinite error.
+The percentage of draws for which this was true for the final design can be
+found in the output \code{inf.error}.
 
 Alternative specific constants can be specified in \code{alt.cte}. The length
 of this binary vector should equal \code{n.alts}, were \code{0} indicates the
 absence of an alternative specific constant and \code{1} the opposite.
 
 \code{start.des} is a list with one or several matrices corresponding to
-initial start design(s). In each matrix each row is a profile. The number of rows
+initial start design(s). In each matrix, each row is a profile. The number of rows
 equals \code{n.sets * n.alts}, and the
 number of columns equals the number of columns of the design matrix + the
 number of non-zero elements in \code{alt.cte}. Consider that for a
@@ -108,14 +130,79 @@ matrix, whereas for a continuous attribute there is only one column. If
 \code{start.des = NULL}, \code{n.start} random initial designs will be
 generated. If start designs are provided, \code{n.start} is ignored.
 
+Note: To make sure the code works well, the names of the variables in the starting
+design should be aligned with variable names that the function \code{Profiles} produces. For
+example, if attribute 1 is a dummy variable of 3 levels then its corresponding columns
+should have numbered names such as: var11 and var12, or (if labelled) price1 and price2, for instance.
+
 If \code{no.choice} is \code{TRUE}, in each choice set an alternative with
 one alternative specific constant is added. The return value of the
-D(B)-error is however based on the design without the no choice option.
+A(B) or D(B)-error is however based on the design without the no choice option.
 
 When \code{parallel} is \code{TRUE}, \code{\link[parallel]{detectCores}} will
 be used to decide upon the number of available cores. That number minus 1
 cores will be used to search for efficient designs. The computation time will
 decrease significantly when \code{parallel = TRUE}.
+
+\strong{Partial profiles/overlapping attributes}
+
+If \code{overlap} is set to 1 or more, then partial profiles will be used in
+the resulting efficient designs. The value of \code{overlap} determines the minimum
+number of attributes to overlap in each choice set. The optimising algorithm will
+enforce this constraint across all choice sets. Note that the running time may increase
+significantly, as the algorithm searches through all possible (combinations of) attributes
+to achieve optimisation.
+
+\strong{Blocking}
+
+If the value of \code{n.blocks} is more than 1, a new list with the specified number of blocks of the best design (one with the least A(B)- or D(B)-error) will be added to the output. The algorithm strives to distribute the choice sets of the best design evenly among the blocks, while maintaining level balance across them. The choice sets are assigned sequentially to the blocks, aiming to maintain the closest possible balance among them up to that stage in the sequence. Hence, the algorithm runs different iterations, during each of which the choice sets in the design are shuffled randomly. The argument \code{blocking.iter} specifies the maximum number of these iterations.
+This functionality is also available as a separate function in \code{\link{Blocks}} that works with a given design.
+
+\strong{Adding constraints to the design}
+
+The argument \code{constraints} can be used to determine a list of constraints to be enforced on the resulting efficient design.
+The package offers flexibility in the possible constraints. The basic syntax for the constraint should determine an attribute Y within an alternative X (\code{AltX.AttY}) and an operator to be applied on that attribute followed by a list of values or another attribute. In addition to this basic syntax, conditional If statements can be included in the conditions as will be shown in the examples below.
+The following operators can be used:
+\itemize{
+\item \code{=}
+\item \code{!=}
+\item \code{<} or \code{<=}
+\item \code{>} or \code{>=}
+\item \code{AND}
+\item \code{OR}
+\item +, -, *, / operations for continuous attributes.
+}
+
+For example, if attributes 1, 2 and 3 are continuous attributes, then possible constraints include:
+\itemize{
+\item \code{"Alt2.Att1 = list(100, 200)"}: restrict values of attribute 1 in alternative 2 to 100 and 200.
+\item \code{"Alt1.Att1 > Alt2.Att1"}: enforce that attribute 1 in alternative 1 to be higher than the attribute's value in alternative 2.
+\item \code{"Alt1.Att1 + Alt1.Att2 < Alt1.Att3"}: enforce that the sum of attributes 1 and 2 to be less than the value of attribute 3 in alternative 1.
+\item \code{"Alt1.Att1 > Alt1.Att3 OR Alt1.Att2 > Alt1.Att3"}: either attribute 1 or attribute 2 should be higher than attribute 3 in alternative 1.
+}
+
+For dummy and effect coded attributes, the levels are indicated with the number of the attribute followed by a letter from the alphabet. For example \code{1A} is the first level of attribute 1 and \code{3D} is the fourth level of attribute 3. Examples on constraints with dummy/effect coded variables:
+\itemize{
+\item \code{"Alt2.Att1 = list(1A,1B)"}: restrict attribute 1 in alternative 2 to the reference level (A) and the second level (B).
+\item \code{"Alt1.Att1 = list(1B,1C) AND Alt2.Att2 != list(2A, 2E)"}: restrict attribute 1 in alternative 1 to the second and third levels, and at the same time, attribute 2 in alternative 2 cannot be the first and fifth levels of the attribute.
+}
+
+Additionally, and as aforementioned, conditional If statements can be included in the conditions. Examples:
+\itemize{
+\item \code{"if Alt1.Att1 != Alt2.Att1 then Alt2.Att2 = list(100,200)"}
+\item \code{"if Alt1.Att1 = Alt2.Att1 OR Alt1.Att1 = 0 then Alt2.Att1 > 3"}
+}
+
+Lastly, more than one constraint can be specified at the same time. For example: \code{constraints = list("if Alt1.Att1 != Alt2.Att1 then Alt2.Att2 = list(100,200)", "Alt1.Att3 = list (3A, 3C)")}.
+
+To ensure the best use of constraints in optimising designs, please keep in mind the following:
+\itemize{
+\item Proper spacing should be respected between the terms, to make sure the syntax translates properly into an \code{R} code. To clarify, spaces should be placed before and after the operators listed above. Otherwise, the console will return an error.
+\item Lists should be used for constrained values as shown in the examples above.
+\item Constraints should not be imposed on the \code{no.choice} alternative because it is fixed with zeros for all attributes. The \code{no.choice} alternative, if included, will be the last alternative in every choice set in the design. Therefore, if \code{no.choice} is \code{TRUE} and the no.choice alternative number (= \code{n.alts}) is included in the constraints, the console will return an Error.
+\item Attention should be given when a starting design that does not satisfy the constraint is provided. It is possible that the algorithm might not find a design that is more efficient and, at the same time, that satisfies the constraints.
+\item With tight constraints, the algorithm might fail to find a design that satisfies all the specified constraints.
+}
 }
 \examples{
 \donttest{
@@ -128,6 +215,10 @@ pd <- MASS::mvrnorm(n = 10, mu = mu, Sigma = v) # 10 draws.
 p.d <- list(matrix(pd[,1], ncol = 1), pd[,2:7])
 CEA(lvls = c(3, 3, 3), coding = c("D", "D", "D"), par.draws = p.d,
 n.alts = 2, n.sets = 8, parallel = FALSE, alt.cte = c(0, 1))
+# Or AB-efficient design
+set.seed(123) 
+CEA(lvls = c(3, 3, 3), coding = c("D", "D", "D"), par.draws = p.d,
+n.alts = 2, n.sets = 8, parallel = FALSE, alt.cte = c(0, 1), optim = "A")
 
 # DB-efficient design with categorical and continuous factors
 # 2 categorical attributes with 4 and 2 levels (effect coded) and 1 
@@ -138,6 +229,10 @@ set.seed(123)
 pd <- MASS::mvrnorm(n = 3, mu = mu, Sigma = v) # 10 draws.
 CEA(lvls = c(4, 2, 3), coding = c("E", "E", "C"), par.draws = pd,
 c.lvls = list(c(2, 4, 6)), n.alts = 2, n.sets = 6, parallel = FALSE)
+# The same can be done if A-optimality is chosen
+set.seed(123)
+CEA(lvls = c(4, 2, 3), coding = c("E", "E", "C"), par.draws = pd,
+c.lvls = list(c(2, 4, 6)), n.alts = 2, n.sets = 6, parallel = FALSE, optim = "A")
 
 # DB-efficient design with start design provided.  
 # 3 Attributes with 3 levels, all dummy coded (= 6 parameters).
@@ -148,5 +243,32 @@ set.seed(123)
 ps <- MASS::mvrnorm(n = 10, mu = mu, Sigma = v) # 10 draws.
 CEA(lvls = c(3, 3, 3), coding = c("D", "D", "D"), par.draws = ps,
 n.alts = 2, n.sets = 8, parallel = FALSE, start.des = sd)
+
+# DB-efficient design with partial profiles
+# 3 Attributes, all dummy coded. = 6 parameters
+mu <- c(1.2, 0.8, 0.2, -0.3, -1.2, 1.6) # Prior parameter vector
+v <- diag(length(mu)) # Prior variance.
+set.seed(123) 
+pd <- MASS::mvrnorm(n = 10, mu = mu, Sigma = v) # 10 draws.
+CEA(lvls = c(3, 3, 3), coding = c("D", "D", "D"), par.draws = pd,
+n.alts = 2, n.sets = 8, parallel = FALSE, alt.cte = c(0, 0), overlap = 1)
+# The same function but asking for blocks (and no overlap)
+set.seed(123)
+CEA(lvls = c(3, 3, 3), coding = c("D", "D", "D"), par.draws = pd,
+n.alts = 2, n.sets = 8, parallel = FALSE, alt.cte = c(0, 0), n.blocks = 2)
+
+# AB-efficient design with constraints
+# 2 dummy coded attributes, 1 continuous attribute and 1 effect coded
+# attribute (with 4 levels). = 8 parameters
+mu <- c(1.2, 0.8, 0.2, 0.5, -0.3, -1.2, 1, 1.6) # Prior parameter vector
+v <- diag(length(mu)) # Prior variance.
+set.seed(123) 
+pd <- MASS::mvrnorm(n = 10, mu = mu, Sigma = v) # 10 draws.
+constraints <- list("Alt2.Att1 = list(1A,1B)",
+                    "if Alt1.Att3 = list(4) then Alt2.Att4 = list(4C, 4D)")
+CEA(lvls = c(3, 3, 2, 4), coding = c("D", "D", "C", "E"), c.lvls = list(c(4,7)), par.draws = pd,
+n.alts = 2, n.sets = 8, parallel = FALSE, alt.cte = c(0, 0), optim = "A", constraints = constraints)
+
+
 }
 }

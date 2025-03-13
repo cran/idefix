@@ -33,3 +33,22 @@ DBerrS.P_ucpp <- function(des, par.draws, n.alts, i.cov, weights) {
   db.error <- mean(w.d.errors, na.rm = TRUE)
   return(db.error)
 }
+
+# Aerror (for Modfed and CEA) 
+Aerr_ucpp <- function(par, des, n.alts) {
+  info.des <- round(InfoDes_cpp(par, des, n.alts), digits = 5) #rounding is to avoid floating point (infinitesimal number but above zero)
+  # using the determinant as a check for the info. matrix invertibility
+  if (det(info.des) < .Machine$double.eps^0.5) {
+  # if (qr(info.des)$rank == ncol(info.des)) {
+    aerror <- NaN
+  } else {
+    temp.error <- sum(diag(solve(info.des)))/length(par)
+    if (temp.error < .Machine$double.eps) { #to avoid potential floating point problem (could result in an incorrect huge negative aErrors)
+      aerror <- NA
+    } else {
+      aerror <- temp.error
+    }
+  }
+  return(aerror)
+}
+

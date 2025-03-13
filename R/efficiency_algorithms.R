@@ -8,44 +8,100 @@
 #' designs.
 #' 
 #' Each iteration will loop through all profiles from the initial design, 
-#' evaluating the change in D(B)-error for every profile from \code{cand.set}. 
-#' The algorithm stops when an iteration occured without replacing a profile or 
-#' when \code{max.iter} is reached.
+#' evaluating the change in A(B) or D(B)-error (as specified) for every profile 
+#' from \code{cand.set}. The algorithm stops when an iteration occurred without 
+#' replacing a profile or when \code{max.iter} is reached.
 #' 
-#' By specifying a numeric vector in \code{par.draws}, the D-error will be 
+#' By specifying a numeric vector in \code{par.draws}, the A- or D-error will be 
 #' calculated and the design will be optimised locally. By specifying a matrix, 
-#' in which each row is a draw from a multivariate distribution, the DB-error 
+#' in which each row is a draw from a multivariate distribution, the AB/DB-error 
 #' will be calculated, and the design will be optimised globally. Whenever there
 #' are alternative specific constants, \code{par.draws} should be a list 
 #' containing two matrices: The first matrix containing the parameter draws for
 #' the alternative specific constant parameters. The second matrix containing
 #' the draws for the rest of the parameters.
 #' 
-#' The DB-error is calculated by taking the mean over D-errors. It could be that
-#' for some draws the design results in an infinite D-error. The percentage of 
-#' draws for which this was true for the final design can be found in the output
-#' \code{inf.error}.
+#' The AB/DB-error is calculated by taking the mean over A/D-errors, respectively. 
+#' It could be that for some draws the design results in an infinite error. 
+#' The percentage of draws for which this was true for the final design can be 
+#' found in the output \code{inf.error}.
 #' 
 #' Alternative specific constants can be specified in \code{alt.cte}. The length
 #' of this binary vector should equal \code{n.alts}, were \code{0} indicates the
 #' absence of an alternative specific constant and \code{1} the opposite.
 #' 
 #' \code{start.des} is a list with one or several matrices  corresponding to 
-#' initial start design(s). In each matrix each
+#' initial start design(s). In each matrix, each
 #' row is a profile. The number of rows equals \code{n.sets * n.alts}, and the
 #' number of columns equals the number of columns of \code{cand.set} + the
 #' number of non-zero elements in \code{alt.cte}. If \code{start.des
 #' = NULL}, \code{n.start} random initial designs will be
 #' generated. If start designs are provided, \code{n.start} is ignored.
 #' 
+#' Note: To make sure the code works well, the names of the variables in the starting 
+#' design should be aligned with variable names that the function \code{Profiles} produces. For
+#' example, if attribute 1 is a dummy variable of 3 levels then its corresponding columns
+#' should have numbered names such as: var11 and var12, or (if labelled) price1 and price2, for instance.
+#' 
 #' If \code{no.choice} is \code{TRUE}, in each choice set an alternative with
 #' one alternative specific constant is added. The return value of the
-#' D(B)-error is however based on the design without the no choice option.
+#' A(B) or D(B)-error is however based on the design without the no choice option.
 #' 
 #' When \code{parallel} is \code{TRUE}, \code{\link[parallel]{detectCores}} will
 #' be used to decide upon the number of available cores. That number minus 1 
 #' cores will be used to search for efficient designs. The computation time will
 #' decrease significantly when \code{parallel = TRUE}.
+#' 
+#' **Partial profiles/overlapping attributes**
+#' 
+#' If \code{overlap} is set to 1 or more, then partial profiles will be used in 
+#' the resulting efficient designs. The value of \code{overlap} determines the minimum 
+#' number of attributes to overlap in each choice set. The optimising algorithm will 
+#' enforce this constraint across all choice sets. Note that the running time may increase 
+#' significantly, as the algorithm searches through all possible (combinations of) attributes 
+#' to achieve optimisation.
+#' 
+#' **Blocking**
+#' 
+#' If the value of \code{n.blocks} is more than 1, a new list with the specified number of blocks of the best design (one with the least A(B)- or D(B)-error) will be added to the output. The algorithm strives to distribute the choice sets of the best design evenly among the blocks, while maintaining level balance across them. The choice sets are assigned sequentially to the blocks, aiming to maintain the closest possible balance among them up to that stage in the sequence. Hence, the algorithm runs different iterations, during each of which the choice sets in the design are shuffled randomly. The argument \code{blocking.iter} specifies the maximum number of these iterations.
+#' This functionality is also available as a separate function in \code{\link{Blocks}} that works with a given design. 
+#' 
+#' **Adding constraints to the design**
+#' 
+#' The argument \code{constraints} can be used to determine a list of constraints to be enforced on the resulting efficient design.
+#' The package offers flexibility in the possible constraints. The basic syntax for the constraint should determine an attribute Y within an alternative X (\code{AltX.AttY}) and an operator to be applied on that attribute followed by a list of values or another attribute. In addition to this basic syntax, conditional If statements can be included in the conditions as will be shown in the examples below.
+#' The following operators can be used:
+#' 
+#'  - \code{=}
+#'  - \code{!=}
+#'  - \code{<} or \code{<=}
+#'  - \code{>} or \code{>=}
+#'  - \code{AND}
+#'  - \code{OR}
+#'  - +, -, *, / operations for continuous attributes.
+#' 
+#' For example, if attributes 1, 2 and 3 are continuous attributes, then possible constraints include:
+#'  * \code{"Alt2.Att1 = list(100, 200)"}: restrict values of attribute 1 in alternative 2 to 100 and 200.
+#'  * \code{"Alt1.Att1 > Alt2.Att1"}: enforce that attribute 1 in alternative 1 to be higher than the attribute's value in alternative 2.
+#'  * \code{"Alt1.Att1 + Alt1.Att2 < Alt1.Att3"}: enforce that the sum of attributes 1 and 2 to be less than the value of attribute 3 in alternative 1.
+#'  * \code{"Alt1.Att1 > Alt1.Att3 OR Alt1.Att2 > Alt1.Att3"}: either attribute 1 or attribute 2 should be higher than attribute 3 in alternative 1.
+#' 
+#' For dummy and effect coded attributes, the levels are indicated with the number of the attribute followed by a letter from the alphabet. For example \code{1A} is the first level of attribute 1 and \code{3D} is the fourth level of attribute 3. Examples on constraints with dummy/effect coded variables:
+#'  * \code{"Alt2.Att1 = list(1A,1B)"}: restrict attribute 1 in alternative 2 to the reference level (A) and the second level (B).
+#'  * \code{"Alt1.Att1 = list(1B,1C) AND Alt2.Att2 != list(2A, 2E)"}: restrict attribute 1 in alternative 1 to the second and third levels, and at the same time, attribute 2 in alternative 2 cannot be the first and fifth levels of the attribute.
+#' 
+#' Additionally, and as aforementioned, conditional If statements can be included in the conditions. Examples:
+#'  * \code{"if Alt1.Att1 != Alt2.Att1 then Alt2.Att2 = list(100,200)"}
+#'  * \code{"if Alt1.Att1 = Alt2.Att1 OR Alt1.Att1 = 0 then Alt2.Att1 > 3"}
+#' 
+#' Lastly, more than one constraint can be specified at the same time. For example: \code{constraints = list("if Alt1.Att1 != Alt2.Att1 then Alt2.Att2 = list(100,200)", "Alt1.Att3 = list (3A, 3C)")}. 
+#' 
+#' To ensure the best use of constraints in optimising designs, please keep in mind the following:
+#'  - Proper spacing should be respected between the terms, to make sure the syntax translates properly into an \code{R} code. To clarify, spaces should be placed before and after the operators listed above. Otherwise, the console will return an error.
+#'  - Lists should be used for constrained values as shown in the examples above.
+#'  - Constraints should not be imposed on the \code{no.choice} alternative because it is fixed with zeros for all attributes. The \code{no.choice} alternative, if included, will be the last alternative in every choice set in the design. Therefore, if \code{no.choice} is \code{TRUE} and the no.choice alternative number (= \code{n.alts}) is included in the constraints, the console will return an Error.
+#'  - Attention should be given when a starting design that does not satisfy the constraint is provided. It is possible that the algorithm might not find a design that is more efficient and, at the same time, that satisfies the constraints.
+#'  -	With tight constraints, the algorithm might fail to find a design that satisfies all the specified constraints.
 #' 
 #' @param cand.set A numeric matrix in which each row is a possible profile. The
 #'   \code{\link{Profiles}} function can be used to generate this matrix.
@@ -64,18 +120,31 @@
 #'   iterations. The default is \code{Inf}.
 #' @param n.start A numeric value indicating the number of random start designs
 #'   to use. The default is 12.
-#' @param best A logical value indicating whether only the best design should be
-#'   returned. The default is \code{TRUE}.
+#' @param optim A character value to choose between "D" and "A" optimality. The default is \code{"D"}.
+#' @param overlap A numeric value indicating the minimum number of attributes to overlap 
+#'    in every choice sets to create partial profiles. The default is \code{NULL}.
+#' @param n.blocks A numeric value indicating the desired number of blocks to
+#'   create out of the most efficient design.
+#' @param blocking.iter A numeric value indicating the maximum number of iterations 
+#'   for optimising the blocks. The default value is 50.
+#' @param constraints A list of constraints to enforce on the attributes and alternatives 
+#'   in every choice set. The default is \code{NULL}.
 #' @return 
-#'  If \code{best = TRUE} the design with the lowest D(B)-error is returned. 
-#'   If \code{best = FALSE}, the results of all (provided) start designs are
-#'   returned. \item{design}{A
-#'   numeric matrix wich contains an efficient design.} \item{error}{Numeric
-#'   value indicating the D(B)-error of the design.} \item{inf.error}{Numeric
-#'   value indicating the percentage of draws for which the D-error was
-#'   \code{Inf}.} \item{probs}{Numeric matrix containing the probabilities of
-#'   each alternative in each choice set. If a sample matrix was provided in
-#'   \code{par.draws}, this is the average over all draws.}
+#'   Two lists of designs and statistics are returned: First, the list \code{BestDesign} contains the design with the lowest A(B)- or D(B)- error. The method \code{print} can be used to return this list. 
+#'   Second, the list \code{AllDesigns} contains the results of all (provided) start designs. The method \code{summary} can be used to return this list.
+#'   \item{design}{A numeric matrix wich contains an efficient design.} 
+#'   \item{optimality}{\code{"A"} or \code{"D"}, depending on the chosen optimality criteria.} 
+#'   \item{inf.error}{Numeric value indicating the percentage of draws for which the D-error was \code{Inf}.} 
+#'   \item{probs}{Numeric matrix containing the probabilities of each alternative 
+#'   in each choice set. If a sample matrix was provided in \code{par.draws}, 
+#'   this is the average over all draws.}
+#'   \item{AB.error}{Numeric value indicating the A(B)-error of the design.} 
+#'   \item{DB.error}{Numeric value indicating the D(B)-error of the design.} 
+#'   \item{SD}{The standrad deviation of the parameters. Calculated by taking the diagonal of the varcov matrix, averaged over all draws if a sample matrix was provided in \code{par.draws}.} 
+#'   \item{level.count}{The count of all levels of each attribute in the design.} 
+#'   \item{level.overlap}{The count of overlapping levels accross alternatives in every choice set in the design.} 
+#'   \item{Orthogonality}{Numeric value indicating the degree of orthogonality of the design. The closer the value to 1, the more orthogonal the design is.} 
+#'   \item{Blocks}{A list showing the created blocks of the best design, along with the level counts in each block. For more details, see function \code{\link{Blocks}}.} 
 #' @examples
 #' \dontrun{
 #' # DB-efficient designs
@@ -86,8 +155,12 @@
 #' set.seed(123) 
 #' pd <- MASS::mvrnorm(n = 10, mu = mu, Sigma = v) # 10 draws.
 #' p.d <- list(matrix(pd[,1], ncol = 1), pd[,2:7])
-#' Modfed(cand.set = cand.set, n.sets = 8, n.alts = 2, 
-#'        alt.cte = c(1, 0), parallel = FALSE, par.draws = p.d, best = FALSE)
+#' Modfed(cand.set = cand.set, n.sets = 8, n.alts = 2, alt.cte = c(1, 0),
+#'        parallel = FALSE, par.draws = p.d)
+#' # Or AB-efficient design
+#' set.seed(123)
+#' Modfed(cand.set = cand.set, n.sets = 8, n.alts = 2, alt.cte = c(1, 0),
+#'        parallel = FALSE, par.draws = p.d, optim = "A")
 #' 
 #' # DB-efficient design with start design provided.  
 #' # 3 Attributes with 3 levels, all dummy coded (= 6 parameters).
@@ -99,14 +172,43 @@
 #' ps <- MASS::mvrnorm(n = 10, mu = mu, Sigma = v) # 10 draws.
 #' Modfed(cand.set = cand.set, n.sets = 8, n.alts = 2, 
 #'        alt.cte = c(0, 0), parallel = FALSE, par.draws = ps, start.des = sd)
+#'        
+#' # DB-efficient design with partial profiles
+#' # 3 Attributes, all dummy coded. = 5 parameters
+#' cand.set <- Profiles(lvls = c(3, 3, 2), coding = c("D", "D", "D")) 
+#' mu <- c(1.2, 0.8, 0.2, -0.3, -1.2) # Prior parameter vector
+#' v <- diag(length(mu)) # Prior variance.
+#' set.seed(123) 
+#' pd <- MASS::mvrnorm(n = 10, mu = mu, Sigma = v) # 10 draws.
+#' Modfed(cand.set = cand.set, par.draws = pd, n.alts = 2,
+#' n.sets = 8, parallel = TRUE, alt.cte = c(0, 0), overlap = 1)
+#' # The same function but asking for blocks (and no overlap)
+#' set.seed(123)
+#' Modfed(cand.set = cand.set, par.draws = pd, n.alts = 2,
+#' n.sets = 8, parallel = TRUE, alt.cte = c(0, 0), n.blocks = 2)
+#' 
+#' # AB-efficient design with constraints
+#' # 2 dummy coded attributes, 1 continuous attribute and 1 effect coded
+#' # attribute (with 4 levels). = 8 parameters
+#' cand.set <- Profiles(lvls = c(3, 3, 2, 4), coding = c("D", "D", "C", "E"),
+#'      c.lvls = list(c(4,7))) 
+#' mu <- c(1.2, 0.8, 0.2, 0.5, -0.3, -1.2, 1, 1.6) # Prior parameter vector
+#' v <- diag(length(mu)) # Prior variance.
+#' set.seed(123) 
+#' pd <- MASS::mvrnorm(n = 10, mu = mu, Sigma = v) # 10 draws.
+#' constraints <- list("Alt2.Att1 = list(1A,1B)",
+#'                     "if Alt1.Att3 = list(4) then Alt2.Att4 = list(4C, 4D)")
+#' Modfed(cand.set = cand.set, par.draws = pd, n.alts = 2, n.sets = 8, 
+#' parallel = TRUE, alt.cte = c(0, 0), optim = "A", constraints = constraints)
 #'}
 #' @importFrom Rdpack reprompt 
 #' @importFrom MASS mvrnorm
 #' @references \insertRef{idefix}{idefix}
 #' @export
-Modfed <- function(cand.set, n.sets, n.alts, par.draws, alt.cte = NULL, no.choice = FALSE, 
-                   start.des = NULL, parallel = TRUE, max.iter = Inf, n.start = 12,
-                   best = TRUE) {
+Modfed <- function(cand.set, n.sets, n.alts, par.draws, optim = "D", alt.cte = NULL, 
+                   no.choice = FALSE, start.des = NULL, parallel = TRUE, max.iter = Inf, 
+                   n.start = 12, overlap = NULL, n.blocks = 1, blocking.iter = 50, constraints = NULL) {
+  
   if (is.null(alt.cte)) {
     alt.cte <- rep(0L, n.alts)
   }
@@ -137,7 +239,8 @@ Modfed <- function(cand.set, n.sets, n.alts, par.draws, alt.cte = NULL, no.choic
   } else {
     ncsek <- NULL
   }
-  # Handling par.draws with alternative specific contstants.
+  
+  # Handling par.draws with alternative specific constants.
   if (isTRUE(all.equal(n.cte, 1))) {
     if (!(is.list(par.draws))) {
       stop("par.draws should be a list")
@@ -233,6 +336,7 @@ Modfed <- function(cand.set, n.sets, n.alts, par.draws, alt.cte = NULL, no.choic
            Make sure the utility of any alternative cannot exceed 700.")
     }
   } 
+  
   if (is.null(start.des)) {
     #create start designs
     nr.starts <- n.start
@@ -240,15 +344,75 @@ Modfed <- function(cand.set, n.sets, n.alts, par.draws, alt.cte = NULL, no.choic
     okstart <- FALSE
     while (okstart == FALSE) {
       for (i in 1:nr.starts) {
-        r <- round(stats::runif((n.sets * n.alts), 1, nrow(cand.set)))
-        start.des[[i]] <- cbind(cte.des, data.matrix(cand.set[r, ]))
+        if (!is.null(overlap) && overlap > 0) {
+          #with overlapping
+          start.des[[i]] <- do.call(rbind, lapply(1:n.sets, function(x) create_overlapping_cs(cand.set, overlap, n.alts)))  
+          start.des[[i]] <- cbind(cte.des, data.matrix(start.des[[i]]))
+        } else {
+          #without overlapping
+          r <- round(stats::runif((n.sets * n.alts), 1, nrow(cand.set)))
+          start.des[[i]] <- cbind(cte.des, data.matrix(cand.set[r, ]))
+        }
+        
+        #add no choice alternative
         if (no.choice) {
           start.des[[i]][ncsek, (ncol(cte.des) + 1):(ncol(cte.des) + ncol(cand.set))] <- c(rep(0, ncol(cand.set)))
         }
+      
+      #constraints####
+      if (!is.null(constraints)) {
+        sets_indeces <- ((c(1:nrow(start.des[[1]])) - 1) %/% n.alts) + 1 #get the choice set number
+        sets_row_start <- unique((sets_indeces - 1) * n.alts + 1) #get the start row in the choice sets
+        sets_row_end <- unique(ifelse(rep(no.choice,length(sets_indeces)), sets_indeces * n.alts - 1, sets_indeces * n.alts)) #get the end row in the choice sets
+        n.par <- ncol(start.des[[1]])
+        
+        #first translate the constraints on coded variables
+        constraints <- lapply(constraints, function(x) {translate_coded_constraints(x, coding = NULL , lvls = NULL, cand.set = cand.set)} )
+        
+        #check that the no.choice alternative is included in any of the constraints
+        if (no.choice) {
+          constrained_alts <- unique(sort(unlist(lapply(constraints, ext_constrained_alts))))
+          if (n.alts %in% constrained_alts) {
+            stop(paste("Alternative", n.alts, "has the no.choice alternative and should not be included in the constraints."))
+          }
+        }
+        
+        #then we do the checking for every choice set 
+        for (s in 1:n.sets) {
+          check <- all(unlist(lapply(constraints, function(x) {check_constraints(start.des[[i]],x,sets_row_start[s],n.cte)})))
+          counter <- 0
+          while (check == FALSE) {
+            if (!is.null(overlap) && overlap > 0) {
+              if (no.choice) {
+                overlapping_set <- do.call(rbind, lapply(1, function(x) create_overlapping_cs(cand.set, overlap, n.alts)))[-1,]  
+              } else {
+                overlapping_set <- do.call(rbind, lapply(1, function(x) create_overlapping_cs(cand.set, overlap, n.alts)))
+              }
+              start.des[[i]][c(sets_row_start[s]:sets_row_end[s]), (n.cte + 1):n.par] <- overlapping_set
+            } else {
+              draws <- ifelse(no.choice, n.alts-1, n.alts)
+              r <- round(stats::runif(draws, 1, nrow(cand.set)))
+              start.des[[i]][c(sets_row_start[s]:sets_row_end[s]), (n.cte + 1):n.par] <- data.matrix(cand.set[r, ])
+            }
+            check <- all(unlist(lapply(constraints, function(x) {check_constraints(start.des[[i]],x,sets_row_start[s],n.cte)})))
+            counter <- counter + 1
+            if (counter == 1000) {
+              message("Exceeded 1000 trials to satisfy the constraints. Consider stopping the run and modifying them.")
+            }
+          }
+        } #2
       }
-      d.start <- lapply(start.des, StartDB, par.draws, n.alts)
+    }
+      ##
+      
+      if(optim %in% c("D","d") ) {
+        d.start <- lapply(start.des, StartDB, par.draws, n.alts) #DB-error
+      } else {
+        d.start <- lapply(start.des, StartAB, par.draws, n.alts) #AB-error
+      }
+      
       if(!any(is.finite(unlist(lapply(d.start, mean, na.rm = TRUE))))){
-        stop("One or more draws resulted in an unvalid d-error. 
+        stop("One or more draws resulted in an invalid d-error. 
              Make sure the utility of any alternative cannot exceed 700.")
       } else {
         okstart <- TRUE
@@ -256,32 +420,117 @@ Modfed <- function(cand.set, n.sets, n.alts, par.draws, alt.cte = NULL, no.choic
     }
   }
   if (parallel) {
-    ########
+    #####
     no_cores <- parallel::detectCores() - 1
     cl <- parallel::makeCluster(no_cores)
-    parallel::clusterExport(cl, c("n.sets", "par.draws", "cand.set", "n.alts", "n.cte", "alt.cte", "no.choice", "max.iter","ncsek"), envir = environment())
-    deslist <- parallel::parLapply(cl, start.des, Modfedje_ucpp, par.draws, cand.set, n.alts, n.sets, n.cte, alt.cte, no.choice, max.iter, ncsek)
+    parallel::clusterExport(cl, c("n.sets", "par.draws", "cand.set", "n.alts", "n.cte", "alt.cte", "no.choice", "max.iter","ncsek", "overlap", "optim", "constraints"), envir = environment())
+    deslist <- parallel::parLapply(cl, start.des, Modfedje_ucpp, par.draws, cand.set, n.alts, n.sets, n.cte, alt.cte, no.choice, max.iter, ncsek, overlap, optim, constraints)
     parallel::stopCluster(cl)
-    ########
+    ####
   } else {
-    deslist <- lapply(start.des, Modfedje_ucpp, par.draws, cand.set, n.alts, n.sets, n.cte, alt.cte, no.choice, max.iter = max.iter, ncsek)
-  }                                 
-  bestdes <- deslist[[which.min(unlist(lapply(deslist, function(x) (x$error))))]]
+    deslist <- lapply(start.des, Modfedje_ucpp, par.draws, cand.set, n.alts, n.sets, n.cte, alt.cte, no.choice, max.iter, ncsek, overlap, optim, constraints)
+  }
   
-  ifelse(best, return(bestdes), return(deslist))
+  #measures/stats####
+  #1-errors
+  ab.error <- unlist(lapply(deslist, function(x) {
+    mean(apply(par.draws, 1, Aerr_ucpp, des = x$design, n.alts = n.alts), na.rm = TRUE)  } ))
+  names(ab.error) <-paste0("des",1:length(start.des))
+  db.error <- unlist(lapply(deslist, function(x) {
+    mean(apply(par.draws, 1, Derr_ucpp, des = x$design, n.alts = n.alts), na.rm = TRUE)  } ))
+  names(db.error) <- paste0("des",1:length(start.des))
+  
+  #2- SD of the parameter estimates
+  SD <- lapply(deslist, function(x) {
+    rowMeans(apply(par.draws, 1, SD, des = x$design, n.alts = n.alts), na.rm = TRUE)
+  })
+  SD.mat <- do.call(rbind, SD)
+  rownames(SD.mat) <- paste0("des",1:length(start.des))
+  
+  #3-orthogonality
+  orthogonality <- unlist(lapply(deslist, function(x) {
+    mean(apply(par.draws, 1, Orthogonality, des = x$design, n.alts = n.alts), na.rm = TRUE)}))
+  names(orthogonality) <- paste0("des",1:length(start.des))
+  
+  #4-level overlaps
+  if (no.choice) {
+    lvl.overlap <- lapply(deslist, function(x) {lvl.overlap(x$design[-ncsek,(ncol(cte.des) + 1):(ncol(cte.des) + ncol(cand.set))], n.alts-1) } )   
+  } else {
+    lvl.overlap <- lapply(deslist, function(x) {lvl.overlap(x$design[,(ncol(cte.des) + 1):(ncol(cte.des) + ncol(cand.set))], n.alts) } )   
+  }
+  lvl.overlap_final <- lvl.overlap[[1]][, 1, drop=FALSE]
+  for (i in 1:length(start.des)) {
+    lvl.overlap_final <- cbind(lvl.overlap_final,lvl.overlap[[i]][, 2])
+  }
+  colnames(lvl.overlap_final)[2:(length(start.des)+1)] = paste0("des",1:length(start.des))
+  
+  #5-level frequencies
+  if (no.choice) {
+    lvl.freq <- lapply(deslist, function(x) {lvl.freq(x$design[-ncsek,(ncol(cte.des) + 1):(ncol(cte.des) + ncol(cand.set))]) } )   
+    } else {
+    lvl.freq <- lapply(deslist, function(x) {lvl.freq(x$design[,(ncol(cte.des) + 1):(ncol(cte.des) + ncol(cand.set))]) } )   
+    }
+  lvl.freq_final <- lvl.freq[[1]]
+  n <- length(lvl.freq_final)
+  for (a in 1:n) {
+    if (length(start.des)>1) {
+      for (i in 2:n.start) {
+        temp <- dplyr::bind_rows(lvl.freq_final[[a]], (lvl.freq[[i]][[a]]))
+        temp[is.na(temp)] <- 0 #replace NAs with zeros
+        lvl.freq_final[[a]] <- temp 
+        }
+      }
+    rownames(lvl.freq_final[[a]]) <- paste0("des",1:length(start.des))
+  }
+  #
+  
+  stat <- list(AB.error = ab.error, DB.error = db.error, SD = SD.mat, level.count = lvl.freq_final, 
+              level.overlap = lvl.overlap_final, Orthogonality = orthogonality)
+  
+  #best design
+  bestdes_ind <- ifelse(optim == "D", which.min(db.error), which.min(ab.error))
+  bestdes <- deslist[[bestdes_ind]]
+  bestdes_stat <- list(
+    AB.error = stat$AB.error[bestdes_ind],
+    DB.error = stat$DB.error[bestdes_ind],
+    SD = stat$SD[bestdes_ind,],
+    level.count = lapply(stat$level.count, function(x) x[bestdes_ind,]),
+    level.overlap = stat$level.overlap[,c(1,bestdes_ind+1)],
+    Orthogonality = stat$Orthogonality[bestdes_ind]
+  )
+  #add blocking (if any) and AllDesigns
+  if (n.blocks > 1) {
+    bestdes_blocks <- Blocks(bestdes$design, n.blocks, n.alts, blocking.iter, 
+                            no.choice, alt.cte) 
+    output_design <- list(BestDesign = c(bestdes[-length(bestdes)], bestdes_stat, bestdes_blocks), 
+                          AllDesigns = c( lapply(deslist, function(x) x[-length(x)] ) , stat)) #lapply is used to remove $error from each list to avoid duplication in stat
+  } else {
+    output_design <- list(BestDesign = c(bestdes[-length(bestdes)], bestdes_stat), 
+                        AllDesigns = c( lapply(deslist, function(x) x[-length(x)] ) , stat)) #lapply is used to remove $error from each list to avoid duplication in stat
+  }
+  ##
+  class(output_design) <- 'design_list'
+  return(output_design)
 }
+
 
 # Core of the Modfed algorithm
 Modfedje_ucpp <- function(desje, par.draws, cand.set, n.alts, n.sets, n.cte, alt.cte,
-                          no.choice, max.iter, ncsek){
+                          no.choice, max.iter, ncsek, overlap, optim, constraints){
+  
   converge <- FALSE
   change <- FALSE
   it <- 1
   n.samples <- nrow(par.draws)
   n.par <- ncol(desje)
+  num_attributes <- as.numeric(max(categorize_variables(colnames(cand.set))))
   ###
   while (!converge & it <= max.iter) {
-    db.start <- mean(apply(par.draws, 1, Derr_ucpp, des = desje,  n.alts = n.alts), na.rm = TRUE)
+    if(optim %in% c("D","d") ) {
+      db.start <- mean(apply(par.draws, 1, Derr_ucpp, des = desje,  n.alts = n.alts), na.rm = TRUE) #DB-error
+    } else {
+      db.start <- mean(apply(par.draws, 1, Aerr_ucpp, des = desje,  n.alts = n.alts), na.rm = TRUE) #AB-error
+    }
     it <- it + 1
     # save design before iteration.
     iter.des <- desje
@@ -291,39 +540,123 @@ Modfedje_ucpp <- function(desje, par.draws, cand.set, n.alts, n.sets, n.cte, alt
       sek <- sek[-ncsek]
     }
     for (r in sek) {
-      # Switch with everey row in candidate set. 
       db <- numeric(nrow(cand.set))
-      for (c in 1:nrow(cand.set)) {
-        desje[r, (n.cte + 1):n.par ] <- cand.set[c, ]
-        # Calculate D-errors.
-        d.errors <- apply(par.draws, 1, Derr_ucpp, des = desje,  n.alts = n.alts)
-        # DB-error. 
-        db[c] <- mean(d.errors, na.rm = TRUE)
-      }
-      pr <- which.min(db)
-      db <- min(db) 
-      # Change if lower db error.
-      if (!is.na(db) && !is.na(db.start)) {
-        if (db < db.start) {
-          best.row <- as.numeric(cand.set[pr, ])
-          db.start <- db
-          change <- TRUE
+      
+      #Initialize the set index and the starting and ending row (to be used for overlapping/constraints)
+      set_index <- ((r - 1) %/% n.alts) + 1 #get the choice set number
+      set_row_start <- (set_index - 1) * n.alts + 1 #get the start row in the choice set
+      set_row_end <- ifelse(no.choice, set_index * n.alts - 1, set_index * n.alts) #get the end row in the choice set (and avoid altering the no choice row)
+        
+      ### beginning of loop for overlap
+      if(!is.null(overlap) && overlap > 0) {
+        
+        # Get all combinations of the variables to overlap
+        attribute_combinations <- utils::combn(num_attributes, overlap, simplify = FALSE)
+        
+        
+        for (combo in attribute_combinations) {
+          # combo <- attribute_combinations[[1]]
+          overlap_indices <- combo
+          overlap_indices <- which(categorize_variables(colnames(cand.set)) %in% overlap_indices) + n.cte #extend the filtering to all the relevant columns for the overlapped variables (in case of dummy/effect treatments with more than 2 levels)
+          
+          temp_desje <- list()
+          for (c in 1:nrow(cand.set)) {
+            temp_desje[[c]] <- desje
+            temp_desje[[c]][r, (n.cte + 1):n.par] <- cand.set[c, ]
+            
+            # Apply the overlapping values to all alternatives in the same choice set
+            for (alt in set_row_start:set_row_end) {
+              if (alt != r) {
+                temp_desje[[c]][alt, overlap_indices] <- temp_desje[[c]][r, overlap_indices]
+              }
+            }
+            
+            # Check if the constraints are met, and skip to the next row if negative
+            if (!is.null(constraints)) {
+              check <- all(unlist(lapply((constraints), function(x) {check_constraints(temp_desje[[c]], x, set_row_start, n.cte)})))
+              if (!check) {
+                db[c] <- NA
+                next
+              }
+            }
+            
+            # Calculate D-errors
+            if(optim %in% c("D","d") ) {
+              # temp_score <- mean(apply(par.draws, 1, Derr_ucpp, des = temp_desje[[c]], n.alts = n.alts), na.rm = TRUE)
+              db[c] <- mean(apply(par.draws, 1, Derr_ucpp, des = temp_desje[[c]], n.alts = n.alts), na.rm = TRUE)
+            } else {
+              # temp_score <- mean(apply(par.draws, 1, Aerr_ucpp, des = temp_desje[[c]], n.alts = n.alts), na.rm = TRUE)
+              db[c] <- mean(apply(par.draws, 1, Aerr_ucpp, des = temp_desje[[c]], n.alts = n.alts), na.rm = TRUE)
+            }
+          }
+          
+          pr <- which.min(db)
+          db <- suppressWarnings(min(db, na.rm = TRUE)) #if all errors are equal to NaN, db will be Inf. We suppress this warning here.
+          
+          # Check if this design is better
+          # if (!is.na(db[c]) && !is.na(db.start)) {
+          if (!is.na(db) && !is.na(db.start)) {
+            if (db < db.start) {
+              desje <- temp_desje[[pr]]
+              db.start <- db
+            }
+          }
         }
-      }
-      # Replace with best profile if change.
-      if (change) {
-        desje[r, (n.cte + 1):n.par] <- best.row
+        ### end of loop for overlap
       } else {
-        desje[r, ] <- iter.des[r, ]
+      # Switch with every row in candidate set. 
+        for (c in 1:nrow(cand.set)) {
+          desje[r, (n.cte + 1):n.par ] <- cand.set[c, ]
+          # Check if the constraints are met, and skip to the next row if negative
+          if (!is.null(constraints)) {
+            check <- all(unlist(lapply((constraints), function(x) {check_constraints(desje,x,set_row_start,n.cte)})))
+            if (!check) {
+              db[c] <- NA #since this iteration does not satisfy the constraint
+              next
+            } 
+          }
+        
+          # Calculate D-errors or A-errors.
+          if(optim %in% c("D","d") ) {
+            d.errors <- apply(par.draws, 1, Derr_ucpp, des = desje,  n.alts = n.alts)
+          } else {
+            d.errors <- apply(par.draws, 1, Aerr_ucpp, des = desje,  n.alts = n.alts)
+          }
+        
+          # AB/DB-error. 
+          db[c] <- mean(d.errors, na.rm = TRUE)
+        }
+      
+        pr <- which.min(db)
+        db <- suppressWarnings(min(db, na.rm = TRUE)) #if all errors are equal to NaN, db will be Inf. We suppress this warning here.
+      
+        # Change if lower db error.
+        if (!is.na(db) && !is.na(db.start)) {
+          if (db < db.start) {
+            best.row <- as.numeric(cand.set[pr, ])
+            db.start <- db
+            change <- TRUE
+          }
+        }
+        # Replace with best profile if change.
+        if (change) {
+          desje[r, (n.cte + 1):n.par] <- best.row
+        } else {
+          desje[r, ] <- iter.des[r, ]
+        }
+        # Initialize variables again. 
       }
-      # Initialize variables again. 
       change <- FALSE
       na.percentage <- 0
     }
     converge <- isTRUE(all.equal(desje, iter.des)) # Convergence if no profile is swapped this iteration.
   }
   # calculate percentage NA values.
-  d.errors <- apply(par.draws, 1, Derr_ucpp, des = desje,  n.alts = n.alts)
+  if(optim %in% c("D","d") ) {
+    d.errors <- apply(par.draws, 1, Derr_ucpp, des = desje,  n.alts = n.alts)
+  } else {
+    d.errors <- apply(par.draws, 1, Aerr_ucpp, des = desje,  n.alts = n.alts)
+  }
   if (any(is.na(d.errors))) {
     na.percentage <- scales::percent(sum(is.na(d.errors)) / n.samples)
   } 
@@ -350,7 +683,9 @@ Modfedje_ucpp <- function(desje, par.draws, cand.set, n.alts, n.sets, n.cte, alt
     colnames(desje)[1:n.cte] <- des.names[[2]]
   }
   # Return design, D(B)error, percentage NA's, utility balance. 
-  return(list("design" = desje, "error" =  db.start, "inf.error" = na.percentage, "probs" = pmat))
+  return(list("design" = desje, "inf.error" = na.percentage, "probs" = pmat, "optimality" =  optim,
+              "error" =  db.start
+              ))
 }
 
 

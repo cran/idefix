@@ -38,7 +38,7 @@ is \code{NULL}.}
 }
 \value{
 \item{design}{A character matrix which represents the design.}
-\item{lvl.balance}{A list containing the frequency of appearance of each
+\item{level.count}{A list containing the frequency of appearance of each
 attribute level in the design.}
 }
 \description{

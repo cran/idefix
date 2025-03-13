@@ -33,11 +33,15 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Frits Traets \email{frits.traets@kuleuven.be}
+\strong{Maintainer}: Michel Meulders \email{michel.meulders@kuleuven.be}
 
 Other contributors:
 \itemize{
+  \item Frits Traets \email{frits.traets@gmail.com}[author]
   \item Daniel Gil \email{danielgils@gmail.com} [contributor]
+  \item Qusai Iwidat \email{qusaiu@gmail.com} [contributor]
+  \item Mouhannad Arabi \email{Mouhannadarabi@hotmail.com} [contributor]
+  \item Martina Vandebroek \email{Martina.Vandebroek@kuleuven.be} [contributor]
 }
 
 }

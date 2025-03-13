@@ -1,3 +1,4 @@
+
 #'Shiny application to generate a discrete choice survey.
 #'
 #'This function starts a shiny application which puts choice sets on screen and 
@@ -203,25 +204,28 @@
 #'           no.choice = 3, alt.cte = c(0, 0, 1))
 #'}
 #'@import shiny
+#'@importFrom shinyjs useShinyjs toggle
+#'@import tableHTML
 #'@export
+
 SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
-                       alt.cte = NULL, no.choice = NULL,
-                       buttons.text, intro.text, end.text, data.dir = NULL,
-                       c.lvls = NULL, prior.mean = NULL,
-                       prior.covar = NULL, cand.set = NULL, n.draws = NULL, 
-                       lower = NULL, upper = NULL, parallel = TRUE, reduce = TRUE) {
+                      alt.cte = NULL, no.choice = NULL,
+                      buttons.text, intro.text, end.text, data.dir = NULL,
+                      c.lvls = NULL, prior.mean = NULL,
+                      prior.covar = NULL, cand.set = NULL, n.draws = NULL,
+                      lower = NULL, upper = NULL, parallel = TRUE, reduce = TRUE) {
   # Initialize
   algorithm = "MOD"
   sdata <- vector(mode = "list")
   surveyData <- vector(mode = "list")
   y.bin <- vector("numeric")
   resp  <- vector("character")
+  resp2  <- vector(mode = "list", n.total) ; names(resp2) <- 1:n.total
   n.atts <- length(atts)
   n.alts <- length(alts)
   n.levels <- as.vector(unlist(lapply(lvl.names,length)))
-  choice.sets <- matrix(data = NA, nrow = n.total * n.alts, ncol = n.atts)
+  choice.sets <- (matrix(data = NA, nrow = n.total * n.atts, ncol = n.alts, dimnames = list(rep(atts,n.total),alts)))
   buttons <- NULL
-  sn <- 0
   if (is.null(des)) {
     n.init <- 0
   } else {
@@ -235,7 +239,7 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
     n.cte <- 0
     cte.des <- NULL
   } else {
-    # Error 
+    # Error
     if (length(alt.cte) != n.alts) {
       stop("length(alts) does not match length(alt.cte)")
     }
@@ -258,15 +262,15 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
     if (!is.numeric(no.choice)) {
       stop("'no.choice' should be an integer indicating the no choice alternative.")
     }
-      if (!no.choice %% 1 == 0) {
-        stop("'no.choice' should be an integer")
-      }
-      if (any(isTRUE(no.choice > (n.alts + 0.2)), isTRUE(no.choice < 0.2))) {
-        stop("'no.choice' does not indicate one of the alternatives")
-      }
-      if (!isTRUE(all.equal(alt.cte[no.choice], 1))) {
-        stop("the location of the 'no.choice' option in the 'alt.cte' vector should correspond with 1")
-      }
+    if (!no.choice %% 1 == 0) {
+      stop("'no.choice' should be an integer")
+    }
+    if (any(isTRUE(no.choice > (n.alts + 0.2)), isTRUE(no.choice < 0.2))) {
+      stop("'no.choice' does not indicate one of the alternatives")
+    }
+    if (!isTRUE(all.equal(alt.cte[no.choice], 1))) {
+      stop("the location of the 'no.choice' option in the 'alt.cte' vector should correspond with 1")
+    }
   }
   if (!is.null(data.dir)) {
     if (!dir.exists(data.dir)) {
@@ -284,16 +288,16 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
       stop("length 'prior.mean' should equal 'upper' and 'lower'")
     }
     if (algorithm == "MOD") {
-      if (any(c(is.null(prior.mean), is.null(prior.covar), is.null(cand.set), 
-               is.null(n.draws)))) {
-      stop("When n.total is larger than the number of sets in argument des, arguments prior.mean, prior.covar, cand.set and n.draws should be specified.")
+      if (any(c(is.null(prior.mean), is.null(prior.covar), is.null(cand.set),
+                is.null(n.draws)))) {
+        stop("When n.total is larger than the number of sets in argument des, arguments prior.mean, prior.covar, cand.set and n.draws should be specified.")
       }
       if (length(prior.mean) != ncol(cand.set) + sum(alt.cte)) {
         stop("Number of parameters in prior.mean does not match with cand.set + alt.cte")
       }
     } else if (algorithm == "CEA") {
       if (any(c(is.null(prior.mean), is.null(prior.covar), is.null(n.draws)))) {
-      stop("When n.total is larger than the number of sets in argument des, arguments prior.mean, prior.covar and n.draws should be specified.")
+        stop("When n.total is larger than the number of sets in argument des, arguments prior.mean, prior.covar and n.draws should be specified.")
       }
     }
     
@@ -303,7 +307,7 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
   } else {
     if (!is.null(prior.mean)) {
       warning("'prior.mean' will be ignored, since there are no adaptive sets.")
-    } 
+    }
     if (!is.null(prior.covar)) {
       warning("'prior.covar' will be ignored, since there are no adaptive sets.")
     }
@@ -325,12 +329,12 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
     }
   } else {
     bs <- seq(1, (nrow(des) - n.alts + 1), n.alts)
-    es <- c((bs - 1), nrow(des))[-1] 
-    rowcol <- Rcnames(n.sets = n.init, n.alts = n.alts, alt.cte = alt.cte, 
+    es <- c((bs - 1), nrow(des))[-1]
+    rowcol <- Rcnames(n.sets = n.init, n.alts = n.alts, alt.cte = alt.cte,
                       no.choice = FALSE)
     rownames(des) <- rowcol[[1]]
     if (is.null(colnames(des))) {
-      colnames(des) <- c(rowcol[[2]], paste("par", 1:(ncol(des) - n.cte), 
+      colnames(des) <- c(rowcol[[2]], paste("par", 1:(ncol(des) - n.cte),
                                             sep = "."))
     }
     fulldes <- des
@@ -351,50 +355,107 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
   shinyApp(
     ### User interface
     ui <- fluidPage(
-      # Put setnr on screen
-      column(8, align = 'center', textOutput("set.nr")),
-      # Put design on screen
-      column(8, align = 'center', tableOutput("choice.set")),
-      # Put answer options on screen
-      column(8, align = 'center', uiOutput('buttons')), 
-      # put introtext on screen
-      column(8, align = 'center', textOutput('intro')),
-      # Put action button on screen
-      column(8, align = "center", actionButton("OK", "OK")),
-      # put end text on screen
-      column(8, align = 'center', textOutput('end'))
-    ),
+      shinyjs::useShinyjs(),
+      # titlePanel("DCE Survey"),
+      titlePanel(" "),
+      sidebarLayout(
+        sidebarPanel(
+          uiOutput("navigationPanel"),
+          width = 3
+        ),
+        mainPanel(
+          #set number
+          textOutput("set.nr"),
+          #choice set HTML table
+          uiOutput("choice.set"),
+          #navigation buttons
+          fluidRow(
+            # column(2, actionButton("Prev", "Previous", class = "btn-primary")),
+            column(2, actionButton("Next", "Next", class = "btn-primary"))
+          ),
+          # Put answer options on screen
+          HTML('&nbsp;'), # White space
+          #intro text
+          textOutput("intro"),
+          #end text
+          textOutput("end"),
+          #status for response
+          fluidRow(column(8, textOutput("responseStatus"))),
+          #Starting button
+          actionButton("OK", "Start"),
+          #Ending button
+          actionButton("Submit", "Submit")
+        )
+      )
+    )
+    
+    ,
     ### Server
-    server <- function(input, output) {
-      # Count set number
+    server <- function(input, output, session) {
+      
+      # Initialize count for set number
+      currentSetIndex <- reactiveVal(0)
+      
+      # Initialize reactiveValues list for responses with the NAs
+      responses <- reactiveValues() #to track answered/unanswered choice sets
+      for (i in names(resp2)) {
+        responses[[i]] <- resp2[[i]]
+      }
+      
+      #first Ok button is clicked
       observeEvent(input$OK, {
-        sn <<- sn + 1
+        currentSetIndex(currentSetIndex() + 1)
+        output$choice.set <- SelectHTML()
+        #create the navigation panel  
+        output$navigationPanel <- 
+          renderUI({
+          if(currentSetIndex() > 0 && currentSetIndex() <= n.total ){
+            lapply(seq(n.total), function(i) { #for cases when n.sets is less than the provided sets in the design
+              fluidRow(
+                column(5,
+                       actionButton(paste0("choiceSetBtn", i), label = paste("Choice Set", i),
+                                    class = ifelse(!is.null(responses[[as.character(i)]]), "btn-success", "btn-default"))
+                )
+              )
+            })
+          }
+        })
+        
       })
+
+      #Building the choice set tables####
       # Set selection function
       Select <- function() {
-        if (sn <= n.total) {
-          # for initial sets 
-          if (sn <= n.init) {
-            set <- des[bs[sn]:es[sn], ]
+        if (currentSetIndex() <= n.total) {
+          #determine indexes for set in choice sets
+          set_row_start <- (currentSetIndex() - 1) * n.atts + 1
+          set_row_end <- currentSetIndex() * n.atts
+          
+          # for initial sets
+          if (currentSetIndex() <= n.init) {
+            set <- fulldes[bs[as.numeric(currentSetIndex())]:es[as.numeric(currentSetIndex())], ]
           } else {
             ## sample drawing for adaptive sets
             # if First set
-            if (sn == 1) {
+            if (currentSetIndex() == 1) {
               # sample draws from prior
-              s <- tmvtnorm::rtmvnorm(n = n.draws, mean = prior.mean, 
-                                      sigma = prior.covar, lower = lower, 
+              s <- tmvtnorm::rtmvnorm(n = n.draws, mean = prior.mean,
+                                      sigma = prior.covar, lower = lower,
                                       upper = upper)
               w <- rep(1, nrow(s)) / nrow(s)
               if (sum(alt.cte) > 0.2) {
-                s <- list(as.matrix(s[ , 1:sum(alt.cte)], ncol = sum(alt.cte)), 
+                s <- list(as.matrix(s[ , 1:sum(alt.cte)], ncol = sum(alt.cte)),
                           s[ , -c(1:sum(alt.cte))])
               }
               # From second set
             } else {
+              #load the provided responses up to this point
+              resp  <<- unlist(reactiveValuesToList(responses))
+              y.bin <<- Charbin(resp = resp[1:n.init], alts = alts, n.alts = n.alts)
               # Sample draws from updated posterior
-              sam <- ImpsampMNL(n.draws = n.draws, prior.mean = prior.mean, 
+              sam <- ImpsampMNL(n.draws = n.draws, prior.mean = prior.mean,
                                 prior.covar = prior.covar,
-                                des = fulldes, n.alts = n.alts, y = y.bin, 
+                                des = fulldes, n.alts = n.alts, y = y.bin,
                                 alt.cte = alt.cte, lower = lower, upper = upper)
               s <- sam$sample
               w <- sam$weights
@@ -402,48 +463,51 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
             ## Selecting set
             if (algorithm == "MOD") {
               # Select new set based on Modfed
-              setobj <- SeqMOD(des = des, cand.set = cand.set, n.alts = n.alts, 
-                               par.draws = s, prior.covar = prior.covar, 
-                               alt.cte = alt.cte, weights = w, 
-                               no.choice = no.choice, parallel = parallel, 
+              setobj <- SeqMOD(des = des, cand.set = cand.set, n.alts = n.alts,
+                               par.draws = s, prior.covar = prior.covar,
+                               alt.cte = alt.cte, weights = w,
+                               no.choice = no.choice, parallel = parallel,
                                reduce = reduce)
             } else if (algorithm == "CEA") {
               setobj <- SeqCEA(des = des, lvls = n.levels, coding = coding,
-                               n.alts = n.alts, par.draws = s, 
+                               n.alts = n.alts, par.draws = s,
                                prior.covar = prior.covar, alt.cte = alt.cte,
-                               weights = w, no.choice = no.choice, 
+                               weights = w, no.choice = no.choice,
                                parallel = parallel, reduce = reduce)
             }
             set <- setobj$set
             db  <- setobj$db
             
             ## Design storage
-            if (sn == 1) {
+            if (currentSetIndex() == 1) {
               rowcol <- Rcnames(n.sets = 1, n.alts = n.alts, alt.cte = alt.cte, no.choice = FALSE)
-              rownames(set) <- rownames(set, do.NULL = FALSE, prefix = paste(paste("set", sn , sep = ""), "alt", sep = "."))
+              rownames(set) <- rownames(set, do.NULL = FALSE, prefix = paste(paste("set", currentSetIndex() , sep = ""), "alt", sep = "."))
               colnames(set) <- c(rowcol[[2]], paste("par", 1:(ncol(set) - n.cte), sep = "."))
               fulldes <<- set
             } else {
               rowcol <- Rcnames(n.sets = 1, n.alts = n.alts, alt.cte = alt.cte, no.choice = FALSE)
-              rownames(set) <- rownames(set, do.NULL = FALSE, prefix = paste(paste("set", sn , sep = ""), "alt", sep = "."))
+              rownames(set) <- rownames(set, do.NULL = FALSE, prefix = paste(paste("set", currentSetIndex() , sep = ""), "alt", sep = "."))
               colnames(set) <- c(rowcol[[2]], paste("par", 1:(ncol(set) - n.cte), sep = "."))
               fulldes <<- rbind(fulldes, set)
             }
+            #added to avoid recreating a new set in case the user navigated back
+            n.init <<- n.init + 1
+            #update the beginning and ending indices for the expanded design
+            bs <<- seq(1, (nrow(fulldes) - n.alts + 1), n.alts)
+            es <<- c((bs - 1), nrow(fulldes))[-1]
+
           }
           # Transform coded set to attribute level character set.
-          choice.set <- Decode(des = set, n.alts = n.alts, lvl.names = lvl.names, coding = coding, 
+          choice.set <- Decode(des = set, n.alts = n.alts, lvl.names = lvl.names, coding = coding,
                                alt.cte = alt.cte, c.lvls = c.lvls, no.choice = no.choice)[[1]]
           choice.set <- t(choice.set[ , 1:n.atts])
           # Fill in attribute names and alternatives names
           colnames(choice.set) <- alts
           rownames(choice.set) <- atts
           # Store uncoded choice set
-          if (sn == 1) {
-            choice.sets <<- choice.set
-          } else {
-            choice.sets <<- rbind(choice.sets, choice.set)
-          }
-          #return design 
+          choice.sets[set_row_start:set_row_end,] <<- choice.set
+
+          #return design
           if (!is.null(no.choice)) {
             no.choice.set <- choice.set[ ,-no.choice]
             return(no.choice.set)
@@ -452,68 +516,138 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
           }
         }
       }
-      #When action button is clicked
-      observeEvent(input$OK, {
-        # survey phase 
-        if (sn <= n.total ) {
+      SelectHTML <- function() {
+        choicesetHTML = tableHTML::render_tableHTML({
+          data <- Select();
+          
+          # Convert the choice set into table rows in HTML format
+          choiceRows <- apply( cbind(rownames(data),data), 1, function(row) {
+            paste0('<tr><td style="font-weight:bold">', paste( row, collapse = '</td><td>'), '</td></tr>')
+            })
+          
+          # Convert the alternatives names into table headers in HTML format
+          alts.header <- paste0('<tr style="font-weight:bold">', paste0('<th id="tableHTML_header_',seq(length(c("",alts))),'">', paste0(c("",alts)), '</th>',collapse =""), '</tr>')
+          
+          # Add radio buttons as a new row, following the number of alternatives
+          selected <- as.character(ifelse(is.null(responses[[as.character(currentSetIndex())]]),0,
+                                         responses[[as.character(currentSetIndex())]]))
+          
+          radioButtonsRow <- paste0(
+            '<tr><td>', buttons.text,'</td>',
+            paste0(unlist(lapply((alts), function(alt) {
+              ind <- which(alt == alts)
+              paste0('<td>', as.character(shiny::radioButtons(
+                inputId = "survey", label = NULL, choices = (alt), selected = selected,inline = TRUE)), '</td>')
+            } )),
+            collapse=""),'</tr>')
+          
+          # HTML code to check the selected radio button in the table
+          insert_string <- "onclick=\\\"this.checked=true; Shiny.setInputValue('survey', this.value)\\\" "
+          pattern <- "(value=\\\"[^\\\"]+\\\")"
+          radioButtonsRow <- gsub(pattern, paste0("\\1 ", insert_string), radioButtonsRow)
+          
+          #build the table
+          tableHTML <- paste0(
+            '<table style="border-collapse:collapse;" class="table table-bordered">',
+            '<thead>', alts.header, '</thead>',
+            '<tbody>',paste(choiceRows, collapse = ""), 
+            radioButtonsRow, '</tbody>',
+            '</table>'
+          )
+          
+          # Return the HTML table
+          choicesetHTML = HTML(tableHTML)
+          class(choicesetHTML) = c("tableHTML")
+          choicesetHTML
+        })
+        
+        return(choicesetHTML)
+      }
+
+      #When next/prev buttons are clicked
+      observeEvent(input$Next, {
+        if (!is.null(responses[[as.character(currentSetIndex())]])) {
+          
+        
+        currentSetIndex(currentSetIndex() + 1)
+        # survey phase
+        if (as.numeric(currentSetIndex()) <= n.total ) {
           # Plot new choice set
-          output$choice.set <-  renderTable(Select(), rownames = TRUE)
-        }
-        # Store responses and design
-        if (sn > 1 && sn <= (n.total + 1)) {
-          resp  <<- c(resp, input$survey)
-          y.bin <<- Charbin(resp = resp, alts = alts, n.alts = n.alts)
-          sdata[["bin.responses"]] <- y.bin
-          sdata[["responses"]] <- resp
-          sdata[["desing"]] <- fulldes
-          sdata[["survey"]] <- choice.sets
-          surveyData <<- sdata 
-        } 
-        # end phase 
-        if (sn > n.total) {
-          #Don't show choice set
-          output$choice.set <-  renderTable(NULL)
+          output$choice.set <-  SelectHTML()
+          }
+        } else {
+          output$responseStatus <- renderText("Status: Please answer the question first")  
         }
       })
-      #Output response options after first action button click
-      output$buttons <- renderUI({
-        # radiobuttons
-        if (input$OK > 0 && input$OK <= n.total) {
-          return(list(radioButtons("survey", buttons.text,
-                                   alts , inline = TRUE, selected = "None")))
+      
+      # set number
+      output$set.nr <- renderText({
+        if (currentSetIndex() >=1 && currentSetIndex() <= n.total) {
+        paste("Choice Set", currentSetIndex() )
         }
       })
-      # set nr
-      observeEvent(input$OK, {
-        if (sn < n.total) {
-          output$set.nr <- renderText(paste(c("choice set:", sn, "/", n.total)))
-        } else {output$set.nr <- renderText(NULL)}
+      
+      #to track answered/unanswered choice sets ####
+      observeEvent(input$survey, {
+        responses[[as.character(currentSetIndex())]] <- input$survey
+        output$choice.set <- SelectHTML() #this line is needed to reload the table after picking a choice
+        output$responseStatus <- renderText("Status: Question Answered")
       })
+      
+      #to show OK/Next/Prev/Submit buttons based on the choice set index
+      observe({
+        output$responseStatus <- renderText(
+          if (currentSetIndex() >=1 && currentSetIndex() <= n.total) {
+          if(is.null(responses[[as.character(currentSetIndex())]])) "Status: Not Answered" else "Status: Question Answered"
+          }
+        )
+        shinyjs::toggle("OK", condition = currentSetIndex() < 1)
+        shinyjs::toggle("Next", condition = currentSetIndex() >= 1 && currentSetIndex() < n.total  )
+        shinyjs::toggle("Submit", condition = length(unlist(reactiveValuesToList(responses))) == n.total)
+      })
+      
       # Introtext
       output$intro <- renderText(intro.text)
+      
+      # after clicking the first ok, the Introtext disappears 
       observeEvent(input$OK, {
         output$intro <- renderText(NULL)
       })
+      
       # End of survey
-      observeEvent(input$OK, {
-        # Display end text 
-        if (input$OK > n.total) {
-          # Display end text 
-          output$end <- renderText(end.text)
+      observeEvent(input$Submit, {
+        #First click
+        if (input$Submit == 1) {
+        
+        #first save the last answered choice set
+        resp  <<- unlist(reactiveValuesToList(responses))
+        y.bin <<- Charbin(resp = unlist(resp), alts = alts, n.alts = n.alts)
+        sdata[["bin.responses"]] <- y.bin
+        sdata[["responses"]] <- resp
+        sdata[["desing"]] <- fulldes
+        sdata[["survey"]] <- choice.sets
+        surveyData <<- sdata
+          
+        # Display end text
+        updateActionButton(session, "Submit", label = "End")
+        currentSetIndex(n.total + 1)
+        output$end <- renderText(end.text)
+        output$set.nr <- renderText("Click 'End' to quit the application.")
+        output$choice.set <-  renderTable(NULL)
+        # Write data to file
+        if (!is.null(data.dir)) {saveData(data = surveyData, data.dir = data.dir, n.atts = n.atts)}
         }
-        # Quit application 
-        if (input$OK > (n.total + 1)) {
-          # Write data to file
-          if (!is.null(data.dir)) {
-            saveData(data = surveyData, data.dir = data.dir, n.atts = n.atts)
-          }
-          # Stop application 
+ 
+        #On second click: Quit application
+        if (input$Submit > 1) {
+          # Stop application
           stopApp()
         }
       })
     }
   )
 }
+
 
 
 
@@ -557,7 +691,7 @@ SurveyApp <- function(des = NULL, n.total, alts, atts, lvl.names, coding,
 #' @inheritParams Profiles
 #' @inheritParams Modfed
 #' @return \item{design}{A character matrix which represents the design.} 
-#'   \item{lvl.balance}{A list containing the frequency of appearance of each 
+#'   \item{level.count}{A list containing the frequency of appearance of each 
 #'   attribute level in the design.}
 #' @examples 
 #' \dontrun{
@@ -660,11 +794,11 @@ Decode <- function(des, n.alts, lvl.names, coding, alt.cte = NULL, c.lvls = NULL
   #frequency levels 
   ml <- list()
   ml <- split(m, rep(1:ncol(m), each = nrow(m)))
-  lvl.balance <- lapply(ml, table)
-  names(lvl.balance) <- paste("attribute", 1:length(coding), "")
+  level.count <- lapply(ml, table)
+  names(level.count) <- paste("attribute", 1:length(coding), "")
   #col row names names 
   rownames(m) <- rownames(des)
-  return(list("design" = as.data.frame(m), "lvl.balance" = lvl.balance))
+  return(list("design" = as.data.frame(m), "level.count" = level.count))
 }
 
 # Character vector to binary vector.
